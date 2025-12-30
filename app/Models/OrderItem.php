@@ -17,6 +17,8 @@ class OrderItem extends Model
     // Relasi: Item ini produk yang mana?
     public function product()
     {
-        return $this->belongsTo(Product::class);
+        // 1. Pakai 'belongsTo' (Karena 1 Baris Order milik 1 Jenis Produk)
+        // 2. Tambah 'withTrashed()' (Supaya produk yang sudah dihapus tetap muncul di riwayat order)
+        return $this->belongsTo(Product::class)->withTrashed();
     }
 }

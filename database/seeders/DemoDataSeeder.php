@@ -65,7 +65,7 @@ class DemoDataSeeder extends Seeder
         $order = Order::create([
             'user_id' => $user->id,
             'customer_id' => $customer->id,
-            'invoice_number' => 'INV-' . $date->format('Ymd') . '-' . rand(1000,9999),
+            'invoice_number' => 'SO-' . $date->format('Ymd') . '-' . rand(1000,9999),
             'total_price' => 0, // Nanti diupdate
             'status' => $paymentStatus == 'paid' ? 'completed' : 'process',
             'payment_status' => $paymentStatus,

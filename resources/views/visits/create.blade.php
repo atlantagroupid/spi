@@ -74,14 +74,25 @@
                     <div class="row">
                         <div class="col-md-6 mb-3">
                             <label class="form-label fw-bold">Lokasi GPS</label>
-                            <div class="input-group mb-2">
-                                <button type="button" onclick="getLocation()" class="btn btn-outline-primary" id="btnGetLoc">
-                                    <i class="bi bi-crosshair"></i> Ambil
-                                </button>
-                                <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Wajib diambil">
-                            </div>
-                            <input type="hidden" name="latitude" id="lat">
-                            <input type="hidden" name="longitude" id="long">
+
+                            @if(auth()->user()->role == 'sales_store')
+                                <div class="alert alert-success d-flex align-items-center" role="alert">
+                                    <i class="bi bi-shop me-2 fs-4"></i>
+                                    <div>
+                                        <strong>Mode Sales Store</strong><br>
+                                        <small>Lokasi GPS tidak diperlukan.</small>
+                                    </div>
+                                </div>
+                            @else
+                                <div class="input-group mb-2">
+                                    <button type="button" onclick="getLocation()" class="btn btn-outline-primary" id="btnGetLoc">
+                                        <i class="bi bi-crosshair"></i> Ambil
+                                    </button>
+                                    <input type="text" id="locationDisplay" class="form-control" readonly placeholder="Wajib diambil">
+                                </div>
+                                <input type="hidden" name="latitude" id="lat">
+                                <input type="hidden" name="longitude" id="long">
+                            @endif
                         </div>
 
                         <div class="col-md-6 mb-3">
@@ -92,7 +103,7 @@
 
                     <div class="mb-3">
                         <label class="form-label">Laporan Hasil</label>
-                        <textarea name="notes" class="form-control" rows="2" placeholder="Hasil kunjungan..."></textarea>
+                        <textarea name="notes" class="form-control" rows="2" placeholder="Hasil kunjungan..." required></textarea>
                     </div>
 
                     <div class="d-grid mt-3">
@@ -105,6 +116,7 @@
     </div>
 </div>
 
+@if(auth()->user()->role != 'sales_store')
 <script>
     function setMode(mode) {
         document.getElementById('inputType').value = mode;
@@ -130,4 +142,12 @@
         } else { alert("Browser tidak support GPS."); }
     }
 </script>
+@else
+<script>
+    function setMode(mode) {
+        document.getElementById('inputType').value = mode;
+    }
+</script>
+@endif
+
 @endsection

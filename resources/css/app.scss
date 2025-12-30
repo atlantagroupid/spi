@@ -1,20 +1,14 @@
-@import 'tailwindcss';
 // Import Bootstrap SCSS
 @import 'bootstrap/scss/bootstrap';
+@import 'bootstrap-icons/font/bootstrap-icons.css';
 
-@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
-@source '../**/*.blade.php';
-@source '../**/*.js';
-
-@theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
-        'Segoe UI Symbol', 'Noto Color Emoji';
-}
-
-/* Style Khusus Sidebar SFA */
+/* ==========================================================================
+   Base Styles
+   ========================================================================== */
 body {
-    overflow-x: hidden; /* Hilangkan scroll samping */
+    overflow-x: hidden;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background-color: #f4f6f9;
 }
 
 #wrapper {
@@ -23,63 +17,382 @@ body {
     align-items: stretch;
 }
 
-#sidebar {
-    min-width: 250px;
-    max-width: 250px;
-    min-height: 100vh; /* Tinggi Full Layar */
-    background: #212529; /* Warna Gelap (Bootstrap Dark) */
-    color: #fff;
-    transition: all 0.3s;
-}
-
-#sidebar .sidebar-header {
-    padding: 20px;
-    background: #1a1e21; /* Sedikit lebih gelap buat header logo */
-}
-
-#sidebar ul.components {
-    padding: 20px 0;
-    border-bottom: 1px solid #4b545c;
-}
-
-#sidebar ul p {
-    color: #fff;
-    padding: 10px;
-}
-
-#sidebar ul li a {
-    padding: 12px 20px;
-    font-size: 1.1em;
-    display: block;
-    color: #adb5bd; /* Warna teks agak abu */
-    text-decoration: none;
-    transition: 0.3s;
-}
-
-#sidebar ul li a:hover,
-#sidebar ul li a.active {
-    color: #fff;
-    background: #0d6efd; /* Biru Bootstrap saat aktif */
-}
-
-#sidebar ul li.active > a,
-a[aria-expanded="true"] {
-    color: #fff;
-    background: #0d6efd;
-}
-
 #content {
     width: 100%;
     min-height: 100vh;
-    background-color: #f8f9fa; /* Abu-abu sangat muda */
+    display: flex;
+    flex-direction: column;
+    transition: all 0.3s;
 }
 
-/* Responsif untuk HP (Sidebar disembunyikan) */
+
+/* ==========================================================================
+   Sidebar Styles
+   ========================================================================== */
+#sidebar {
+    min-width: 260px;
+    max-width: 260px;
+    background: #212529;
+    color: #fff;
+    transition: all 0.3s;
+    z-index: 1000;
+    min-height: 100vh;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+}
+
+#sidebar .sidebar-brand {
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#sidebar .sidebar-brand-icon {
+    flex-shrink: 0;
+}
+
+#sidebar .sidebar-brand-text {
+    font-size: 1rem;
+    letter-spacing: 1px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+#sidebar .sidebar-brand-text span {
+    font-size: 0.7rem;
+    font-weight: 300;
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+#sidebar ul.components {
+    padding: 15px 0;
+}
+
+/* Sidebar Heading */
+.sidebar-heading {
+    padding: 10px 25px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #6c757d;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+
+/* Main Menu Links */
+#sidebar ul li a {
+    padding: 12px 25px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    color: #adb5bd;
+    text-decoration: none;
+    border-left: 4px solid transparent;
+    transition: background 0.2s, color 0.2s, border-left 0.2s;
+}
+
+#sidebar ul li a:hover {
+    color: #fff;
+    background: #2c3034;
+}
+
+#sidebar ul li a.active {
+    color: #fff;
+    background: #343a40;
+    border-left: 4px solid #0d6efd;
+}
+
+/* Dropdown Toggle Fix */
+#sidebar ul li a.dropdown-toggle::after {
+    display: none !important;
+}
+
+#sidebar ul li a.dropdown-toggle {
+    justify-content: space-between;
+}
+
+#sidebar ul li a.dropdown-toggle .bi-chevron-down {
+    transition: transform 0.3s;
+}
+
+#sidebar ul li a.dropdown-toggle[aria-expanded="true"] .bi-chevron-down {
+    transform: rotate(180deg);
+}
+
+/* Submenu Styles */
+#sidebar ul ul {
+    background: #151719;
+    margin: 0;
+    padding: 0;
+}
+
+#sidebar ul ul a {
+    font-size: 0.9em !important;
+    padding-left: 55px !important;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    background: transparent !important;
+    border-left: none !important;
+    color: #adb5bd;
+}
+
+#sidebar ul ul a:hover {
+    color: #0d6efd !important;
+}
+
+#sidebar ul ul a.active {
+    color: #0d6efd !important;
+    font-weight: bold;
+}
+
+
+/* ==========================================================================
+   Responsive Styles
+   ========================================================================== */
+
+/* Sidebar Toggling for smaller screens */
 @media (max-width: 768px) {
     #sidebar {
-        margin-left: -250px;
+        margin-left: -260px;
+        position: fixed;
+        height: 100%;
+        z-index: 1030; /* Higher than navbar */
     }
+
     #sidebar.active {
         margin-left: 0;
     }
+
+    #content {
+        width: 100%;
+    }
+
+    /* Overlay for when sidebar is active */
+    .overlay {
+        display: none;
+        position: fixed;
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 998;
+    }
+
+    .overlay.active {
+        display: block;
+    }
 }
+
+/* Mobile specific improvements */
+@media (max-width: 576px) {
+    /* Adjust notification dropdown on mobile */
+    .dropdown-menu {
+        width: 90vw !important;
+        max-width: 350px !important;
+        right: -10px !important;
+        left: auto !important;
+    }
+
+    /* Reduce navbar brand font size */
+    .navbar-brand {
+        font-size: 1.1rem !important;
+    }
+
+    /* Reduce content padding */
+    #content .container-fluid {
+        padding: 10px !important;
+    }
+
+        /* Hide username in navbar, show only avatar */
+
+        .navbar .d-none.d-sm-inline {
+
+            display: none !important;
+
+        }
+
+    }
+
+    
+
+    /* ==========================================================================
+
+       General Component Styles
+
+       ========================================================================== */
+
+    
+
+    /* Cards */
+
+    .card {
+
+        border: none;
+
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+
+        border-radius: 0.75rem;
+
+    }
+
+    
+
+    .card-header {
+
+        background-color: transparent;
+
+        border-bottom: 1px solid #dee2e6;
+
+        padding: 1rem 1.5rem;
+
+        font-weight: 600;
+
+    }
+
+    
+
+    /* Tables */
+
+    .table {
+
+        --bs-table-bg: transparent;
+
+        --bs-table-striped-bg: #f8f9fa;
+
+    }
+
+    
+
+    .table-hover > tbody > tr:hover > * {
+
+        --bs-table-accent-bg: #e9ecef;
+
+    }
+
+    
+
+    .table th, .table td {
+
+        vertical-align: middle;
+
+    }
+
+    
+
+    /* Buttons */
+
+    .btn {
+
+        border-radius: 0.375rem;
+
+        padding: 0.5rem 1rem;
+
+        font-size: 0.95rem;
+
+        font-weight: 500;
+
+        transition: all 0.2s;
+
+    }
+
+    
+
+    .btn-primary {
+
+        box-shadow: 0 4px 6px rgba(13, 110, 253, 0.1);
+
+    }
+
+    
+
+    .btn-success {
+
+        box-shadow: 0 4px 6px rgba(25, 135, 84, 0.1);
+
+    }
+
+    
+
+    .btn-warning {
+
+        box-shadow: 0 4px 6px rgba(255, 193, 7, 0.1);
+
+    }
+
+    
+
+    .btn-danger {
+
+        box-shadow: 0 4px 6px rgba(220, 53, 69, 0.1);
+
+    }
+
+    
+
+    
+
+    /* Forms */
+
+    .form-control, .form-select {
+
+        border-radius: 0.375rem;
+
+        padding: 0.5rem 1rem;
+
+        transition: all 0.2s;
+
+    }
+
+    
+
+    .form-control:focus, .form-select:focus {
+
+    
+
+        box-shadow: none;
+
+    
+
+        border-color: #0d6efd;
+
+    
+
+    }
+
+    
+
+    
+
+    
+
+    /* Icon spinning animation */
+
+    
+
+    .spin {
+
+    
+
+        animation: spin 2s linear infinite;
+
+    
+
+    }
+
+    
+
+    
+
+    
+
+    @keyframes spin {
+
+    
+
+        0% { transform: rotate(0deg); }
+
+    
+
+        100% { transform: rotate(360deg); }
+
+    
+
+    }

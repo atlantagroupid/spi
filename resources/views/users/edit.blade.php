@@ -30,33 +30,96 @@
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Role</label>
-                            <select name="role" class="form-select" required>
-                                <option value="sales" {{ $user->role == 'sales' ? 'selected' : '' }}>Sales Lapangan</option>
-                                <option value="manager" {{ $user->role == 'manager' ? 'selected' : '' }}>Manager</option>
-                                <option value="admin" {{ $user->role == 'admin' ? 'selected' : '' }}>Admin</option>
-                            </select>
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">Target Visit Harian</label>
-                            <input type="number" name="daily_visit_target" class="form-control" value="{{ old('daily_visit_target', $user->daily_visit_target) }}" min="0">
-                        </div>
+                    <div class="mb-3">
+                        <label class="form-label">Role / Jabatan</label>
+                        <select name="role" id="roleSelect" class="form-select" required onchange="toggleKPI()">
+                            <option value="">-- Pilih Role --</option>
+                            <option value="manager_operasional" {{ $user->role == 'manager_operasional' ? 'selected' : '' }}>Manager Operasional</option>
+                            <option value="manager_bisnis" {{ $user->role == 'manager_bisnis' ? 'selected' : '' }}>Manager Bisnis</option>
+                            <option value="kepala_gudang" {{ $user->role == 'kepala_gudang' ? 'selected' : '' }}>Kepala Gudang</option>
+                            <option value="admin_gudang" {{ $user->role == 'admin_gudang' ? 'selected' : '' }}>Admin Gudang</option>
+
+                            <option value="sales" {{ $user->role == 'sales' ? 'selected' : '' }}>Sales Lapangan (Lama)</option>
+                            <option value="sales_field" {{ $user->role == 'sales_field' ? 'selected' : '' }}>Sales Lapangan (Baru)</option>
+                            <option value="sales_store" {{ $user->role == 'sales_store' ? 'selected' : '' }}>Sales Toko</option>
+
+                            <option value="finance" {{ $user->role == 'finance' ? 'selected' : '' }}>Staf Finance</option>
+                            <option value="purchase" {{ $user->role == 'purchase' ? 'selected' : '' }}>Staf Purchase</option>
+                        </select>
                     </div>
 
-                    <div class="alert alert-warning">
-                        <label class="form-label fw-bold">Ubah Password (Opsional)</label>
+                    <div id="kpi-section" style="display: none;">
+                        <hr class="my-4 border-secondary opacity-25">
+
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <h5 class="fw-bold text-primary">
+                                    <i class="bi bi-graph-up-arrow me-2"></i>Target Kinerja (KPI)
+                                </h5>
+                                <p class="text-muted small">Atur target individu khusus untuk Sales ini.</p>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Target Kunjungan Harian</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white"><i class="bi bi-geo-alt"></i></span>
+                                    <input type="number" name="daily_visit_target" class="form-control"
+                                           value="{{ old('daily_visit_target', $user->daily_visit_target ?? 5) }}"
+                                           min="0">
+                                    <span class="input-group-text bg-light small">Visit / Hari</span>
+                                </div>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label fw-bold">Target Omset Bulanan</label>
+                                <div class="input-group">
+                                    <span class="input-group-text bg-white">Rp</span>
+                                    <input type="number" name="sales_target" class="form-control fw-bold text-success"
+                                           value="{{ old('sales_target', $user->sales_target ?? 0) }}"
+                                           placeholder="Contoh: 50000000">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <hr class="my-4 border-secondary opacity-25">
+
+                    <div class="alert alert-light border">
+                        <label class="form-label fw-bold text-dark"><i class="bi bi-key me-2"></i>Ubah Password (Opsional)</label>
                         <input type="password" name="password" class="form-control" placeholder="Biarkan kosong jika tidak ingin mengganti password">
                     </div>
 
                     <div class="d-flex justify-content-end mt-4">
                         <a href="{{ route('users.index') }}" class="btn btn-secondary me-2">Batal</a>
-                        <button type="submit" class="btn btn-primary">Update Data</button>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold">Update Data</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+    function toggleKPI() {
+        const roleSelect = document.getElementById('roleSelect');
+        const kpiSection = document.getElementById('kpi-section');
+        const role = roleSelect.value;
+
+        // Daftar role yang dianggap sebagai SALES (yang butuh target)
+        const salesRoles = ['sales', 'sales_field', 'sales_store'];
+
+        // Jika role yang dipilih ada di dalam daftar salesRoles -> Tampilkan
+        if (salesRoles.includes(role)) {
+            kpiSection.style.display = 'block';
+        } else {
+            kpiSection.style.display = 'none';
+            // Opsional: Reset nilai target jadi 0 kalau bukan sales?
+            // document.getElementsByName('sales_target')[0].value = 0;
+        }
+    }
+
+    // Jalankan fungsi saat halaman pertama kali dimuat (untuk handle edit data lama)
+    document.addEventListener('DOMContentLoaded', function() {
+        toggleKPI();
+    });
+</script>
 @endsection

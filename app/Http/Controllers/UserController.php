@@ -54,33 +54,39 @@ class UserController extends Controller
         return view('users.edit', compact('user'));
     }
 
-    // 5. Update User
     public function update(Request $request, User $user)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)], // Email boleh sama kalau punya sendiri
-            'role' => 'required|in:admin,manager,sales',
-            'daily_visit_target' => 'nullable|integer|min:0',
-        ]);
+{
+    // 1. Validasi Input
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => ['required', 'email', \Illuminate\Validation\Rule::unique('users')->ignore($user->id)],
+        'role' => 'required|string', // Kita izinkan string agar fleksibel dengan role baru
+        'sales_target' => 'nullable|numeric|min:0',      // Validasi Target Omset
+        'daily_visit_target' => 'nullable|integer|min:0', // Validasi Target Visit
+    ]);
 
-        $data = [
-            'name' => $request->name,
-            'email' => $request->email,
-            'phone' => $request->phone,
-            'role' => $request->role,
-            'daily_visit_target' => $request->daily_visit_target ?? 0,
-        ];
+    // 2. Siapkan Data
+    $data = [
+        'name' => $request->name,
+        'email' => $request->email,
+        'phone' => $request->phone, // Pastikan kolom 'phone' ada di $fillable User model
+        'role' => $request->role,
 
-        // Cek apakah password diisi? Kalau kosong, jangan diupdate
-        if ($request->filled('password')) {
-            $data['password'] = Hash::make($request->password);
-        }
+        // Simpan Target KPI (Pakai operator ?? 0 untuk default)
+        'sales_target' => $request->sales_target ?? 0,
+        'daily_visit_target' => $request->daily_visit_target ?? 5,
+    ];
 
-        $user->update($data);
-
-        return redirect()->route('users.index')->with('success', 'Data user diperbarui!');
+    // 3. Cek Password (Hanya update jika diisi)
+    if ($request->filled('password')) {
+        $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
     }
+
+    // 4. Eksekusi Update
+    $user->update($data);
+
+    return redirect()->route('users.index')->with('success', 'Data user & Target KPI berhasil diperbarui!');
+}
 
     // 6. Hapus User
     public function destroy(User $user)
@@ -92,5 +98,27 @@ class UserController extends Controller
 
         $user->delete();
         return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
+    }
+
+    public function updateSalesTarget(Request $request)
+    {
+        // 1. Validasi: Pastikan yang akses adalah Manager
+        if (!in_array(Auth::user()->role, ['manager_bisnis', 'manager_operasional'])) {
+            abort(403, 'Anda tidak memiliki akses.');
+        }
+
+        // 2. Validasi Input
+        $request->validate([
+            'user_id' => 'required|exists:users,id',
+            'target'  => 'required|numeric|min:0'
+        ]);
+
+        // 3. Update Target
+        $sales = \App\Models\User::findOrFail($request->user_id);
+        $sales->update([
+            'sales_target' => $request->target
+        ]);
+
+        return back()->with('success', 'Target omset untuk ' . $sales->name . ' berhasil diperbarui!');
     }
 }

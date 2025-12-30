@@ -29,7 +29,7 @@ class AuthController extends Controller
             // Cek role user (opsional, untuk redirect nanti)
             $role = Auth::user()->role;
 
-            return redirect()->intended('dashboard')->with('success', 'Selamat datang, ' . Auth::user()->name . '!');
+            return redirect()->intended('dashboard');
         }
 
         // Jika gagal login
@@ -45,6 +45,6 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login')->with('success', 'Anda berhasil logout.');
+        return redirect('/login');
     }
 }

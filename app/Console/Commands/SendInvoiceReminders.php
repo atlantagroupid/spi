@@ -4,28 +4,38 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Models\Order;
-use App\Notifications\InvoiceDueReminder; // Jangan lupa import ini
+use App\Notifications\InvoiceDueReminder; // Pastikan Import ini BENAR
 use Carbon\Carbon;
 
 class SendInvoiceReminders extends Command
 {
-    // 1. Nama perintah buat si Robot
+    /**
+     * Nama perintah buat si Robot
+     */
     protected $signature = 'invoice:remind';
 
-    // 2. Deskripsi tugasnya
-    protected $description = 'Kirim notifikasi otomatis untuk tagihan H-3 jatuh tempo';
+    /**
+     * Deskripsi tugasnya
+     */
+    protected $description = 'Kirim notifikasi otomatis untuk tagihan jatuh tempo (H-7, H-3, H-1, Hari H)';
 
-    // 3. Otak Robotnya (Logika Kerja)
+    /**
+     * Eksekusi Perintah
+     */
     public function handle()
     {
         $this->info('Sedang memeriksa tagihan bertingkat...');
 
-        // Daftar hari yang mau diingatkan (H-7, H-3, H-2, H-1)
-        $intervals = [7, 3, 2, 1];
+        // DAFTAR INTERVAL PENGINGAT:
+        // 7 = Seminggu lagi
+        // 3 = 3 Hari lagi
+        // 1 = Besok
+        // 0 = HARI INI (Sangat Penting)
+        $intervals = [7, 3, 1, 0];
+
         $totalSent = 0;
 
         foreach ($intervals as $days) {
-
             // Hitung tanggal target. Contoh: Hari ini tgl 9. Target H+7 = Tgl 16.
             $targetDate = Carbon::now()->addDays($days)->format('Y-m-d');
 
@@ -35,11 +45,17 @@ class SendInvoiceReminders extends Command
                            ->get();
 
             foreach ($orders as $order) {
-                // Kirim Notif dengan parameter sisa hari ($days)
-                $order->user->notify(new InvoiceDueReminder($order, $days));
+                // Pastikan user/salesnya masih aktif
+                if ($order->user) {
+                    // Kirim Notif dengan parameter sisa hari ($days)
+                    $order->user->notify(new InvoiceDueReminder($order, $days));
 
-                $this->info("[$days Hari Lagi] Notif dikirim: " . $order->invoice_number);
-                $totalSent++;
+                    // Pesan log di terminal
+                    $statusMsg = ($days === 0) ? "HARI INI" : "H-$days";
+                    $this->info("[$statusMsg] Dikirim ke {$order->user->name} | No: {$order->invoice_number}");
+
+                    $totalSent++;
+                }
             }
         }
 

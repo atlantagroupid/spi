@@ -18,9 +18,9 @@ return new class extends Migration
 
             $table->string('invoice_number')->unique(); // No Faktur (Misal: INV-001)
             $table->decimal('total_price', 12, 2)->default(0); // Total Belanja
-            $table->enum('status', ['pending', 'process', 'completed', 'cancelled'])->default('pending');
+            $table->enum('status', ['pending_approval', 'approved', 'completed', 'cancelled', 'rejected', 'shipped', 'delivered'])->default('pending_approval');
             $table->text('notes')->nullable(); // Catatan tambahan
-            
+
             // Di dalam Schema::create('orders'...)
             $table->enum('payment_status', ['unpaid', 'partial', 'paid'])->default('unpaid'); // Status Bayar
             $table->date('due_date')->nullable(); // Tanggal Jatuh Tempo

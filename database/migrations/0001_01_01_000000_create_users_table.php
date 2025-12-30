@@ -17,10 +17,9 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->string('phone')->nullable(); // No HP penting untuk Sales
             // Di dalam Schema::create('users'...)
-            $table->integer('daily_visit_target')->default(0); // Target kunjungan harian
+            // $table->integer('daily_visit_target')->default(0); // Target kunjungan harian
 
-            // Kita pakai ENUM agar isinya terkunci: hanya bisa 'admin', 'manager', atau 'sales'
-            $table->enum('role', ['admin', 'manager', 'sales'])->default('sales');
+            $table->enum('role', ['manager_operasional', 'manager_bisnis', 'purchase', 'kasir', 'admin_gudang', 'kepala_gudang', 'finance', 'sales'])->default('sales');
 
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
