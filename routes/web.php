@@ -125,9 +125,16 @@ Route::middleware('auth')->group(function () {
     Route::resource('orders', OrderController::class);
 
     // --- F. KUNJUNGAN (VISIT) ---
-    Route::resource('visits', VisitController::class)->except(['update', 'destroy']);
+    // Tambahkan 'show' ke dalam daftar pengecualian (except)
+    Route::resource('visits', VisitController::class)->except(['update', 'destroy', 'show']);
     Route::controller(VisitController::class)->prefix('visits')->name('visits.')->group(function () {
-        Route::get('/create-plan', 'createPlan')->name('createPlan');
+
+        // === TAMBAHAN BARU ===
+        // Route untuk halaman "Rencana Visit" (Mengarah ke form createPlan)
+        Route::get('/plan', 'createPlan')->name('plan');
+        // =====================
+
+        Route::get('/create-plan', 'createPlan')->name('createPlan'); // (Opsional: biarkan saja buat backup)
         Route::post('/store-plan', 'storePlan')->name('storePlan');
         Route::post('/update-target', 'updateTarget')->name('updateTarget');
         Route::post('/{visit}/check-in', 'checkIn')->name('checkIn');

@@ -5,7 +5,7 @@
 @section('content')
     @php
         $userRole = Auth::user()->role;
-        $isSales = $userRole === 'sales';
+        $isSales = in_array($userRole, ['sales_field', 'sales_store']);
         // Logic for Manager/Warehouse View
         $isManager = in_array($userRole, ['manager_operasional', 'manager_bisnis']);
         $hasApprovalAccess = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'kepala_gudang']);

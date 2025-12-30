@@ -31,22 +31,17 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Role / Jabatan</label>
-                        <select name="role" id="roleSelect" class="form-select" required onchange="toggleKPI()">
-                            <option value="">-- Pilih Role --</option>
-                            <option value="manager_operasional" {{ $user->role == 'manager_operasional' ? 'selected' : '' }}>Manager Operasional</option>
-                            <option value="manager_bisnis" {{ $user->role == 'manager_bisnis' ? 'selected' : '' }}>Manager Bisnis</option>
-                            <option value="kepala_gudang" {{ $user->role == 'kepala_gudang' ? 'selected' : '' }}>Kepala Gudang</option>
-                            <option value="admin_gudang" {{ $user->role == 'admin_gudang' ? 'selected' : '' }}>Admin Gudang</option>
+                                <label for="role" class="form-label">Role / Jabatan</label>
+                                <select name="role" id="role" class="form-select" required>
+                                    <option value="" disabled selected>-- Pilih Jabatan --</option>
 
-                            <option value="sales" {{ $user->role == 'sales' ? 'selected' : '' }}>Sales Lapangan (Lama)</option>
-                            <option value="sales_field" {{ $user->role == 'sales_field' ? 'selected' : '' }}>Sales Lapangan (Baru)</option>
-                            <option value="sales_store" {{ $user->role == 'sales_store' ? 'selected' : '' }}>Sales Toko</option>
+                                    {{-- Looping Role dari Controller --}}
+                                    @foreach ($roles as $key => $label)
+                                        <option value="{{ $key }}">{{ $label }}</option>
+                                    @endforeach
 
-                            <option value="finance" {{ $user->role == 'finance' ? 'selected' : '' }}>Staf Finance</option>
-                            <option value="purchase" {{ $user->role == 'purchase' ? 'selected' : '' }}>Staf Purchase</option>
-                        </select>
-                    </div>
+                                </select>
+                            </div>
 
                     <div id="kpi-section" style="display: none;">
                         <hr class="my-4 border-secondary opacity-25">

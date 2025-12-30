@@ -5,51 +5,40 @@
     $isKepalaGudang = $userRole === 'kepala_gudang';
     $isAdminGudang = $userRole === 'admin_gudang';
     $isPurchase = $userRole === 'purchase';
-    $isSales = $userRole === 'sales';
+    $isFinance = $userRole === 'finance';
+
+    // Definisikan variabel Sales Spesifik
     $isSalesStore = $userRole === 'sales_store';
     $isSalesField = $userRole === 'sales_field';
-    $isFinance = $userRole === 'finance';
+
+    // GROUP SALES: Gabungan semua jenis sales agar logic lebih simpel
+    $isAnySales = in_array($userRole, ['sales_store', 'sales_field']);
 
     // --- 1. CEK PERMISSION SUB-MENU ---
     $canViewProducts = in_array($userRole, ['manager_operasional', 'kepala_gudang', 'admin_gudang', 'purchase']);
     $canViewCustomers = !in_array($userRole, ['kepala_gudang', 'admin_gudang', 'purchase']);
     $canManageUsers = $isManagerOperasional;
-    $canViewVisits = in_array($userRole, ['sales', 'manager_operasional', 'manager_bisnis']);
 
-    $canCreateOrder = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'sales', 'sales_store', 'sales_field']);
-    // Asumsi: Semua user yang login boleh lihat riwayat order mereka sendiri/tim
+    // PERBAIKAN DISINI: Tambahkan $isAnySales agar Sales Lapangan bisa lihat menu Visit
+    $canViewVisits = $isAnySales || in_array($userRole, ['manager_operasional', 'manager_bisnis']);
+
+    $canCreateOrder = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'sales_store', 'sales_field']);
     $canViewOrderHistory = true;
 
-    $canViewReceivables = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'finance', 'sales', 'sales_store', 'sales_field']);
-    $canRequestTop = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'sales', 'sales_store', 'sales_field']);
+    $canViewReceivables = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'finance', 'sales_store', 'sales_field']);
+    $canRequestTop = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'sales_store', 'sales_field']);
 
     $isApprover = in_array($userRole, ['manager_bisnis', 'kepala_gudang']);
     $canViewApprovals = $isApprover || $isManagerOperasional;
 
     // --- 2. HITUNG VISIBILITAS MENU UTAMA (PARENT) ---
-    // Menu Keuangan
     $showFinanceMenu = $canViewReceivables || $canRequestTop;
-
-    // Menu Pesanan
     $showOrderMenu = $canCreateOrder || $canViewOrderHistory;
-
-    // Menu Approval
     $showApprovalMenu = $canViewApprovals;
-
-    // Menu Visit
-    $showVisitMenu = $canViewVisits;
-
-    // Menu Customer
+    $showVisitMenu = $canViewVisits; // Sekarang sudah TRUE untuk Sales Lapangan
     $showCustomerMenu = $canViewCustomers;
-
-    // Menu User (Hanya Manager Ops)
     $showUserMenu = $canManageUsers;
-
-    // Menu Quota / Plafon (Manager Ops, Manager Bisnis, DAN SEMUA SALES)
-    // PERBAIKAN DISINI: Menambahkan role sales agar menu muncul
-    $showQuotaMenu = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'sales', 'sales_store', 'sales_field']);
-
-    // Menu Settings
+    $showQuotaMenu = $isManagerOperasional || $isManagerBisnis || $isAnySales;
     $showSettingsMenu = $isManagerOperasional;
 @endphp
 
@@ -94,10 +83,17 @@
                     <i class="bi bi-chevron-down small"></i>
                 </a>
                 <ul class="collapse list-unstyled {{ request()->is('visits*') ? 'show' : '' }}" id="visitSubmenu">
-                    @if ($isSales)
+                    {{-- Semua jenis Sales boleh buat Rencana Visit --}}
+                    @if ($isAnySales)
                         <li><a href="{{ route('visits.plan') }}" class="{{ request()->is('visits/plan') ? 'active' : '' }}">Rencana Visit</a></li>
                     @endif
-                    <li><a href="{{ route('visits.index') }}" class="{{ request()->is('visits', 'visits/index') ? 'active' : '' }}">{{ $isSales ? 'Riwayat Visit' : 'Monitoring Sales' }}</a></li>
+
+                    {{-- Label dinamis: Sales = Riwayat, Manager = Monitoring --}}
+                    <li>
+                        <a href="{{ route('visits.index') }}" class="{{ request()->is('visits', 'visits/index') ? 'active' : '' }}">
+                            {{ $isAnySales ? 'Riwayat Visit' : 'Monitoring Sales' }}
+                        </a>
+                    </li>
                 </ul>
             </li>
         @endif
