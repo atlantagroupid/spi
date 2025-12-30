@@ -113,6 +113,7 @@ Route::middleware('auth')->group(function () {
 
     // --- E. TRANSAKSI (ORDERS) ---
     // PENTING: Custom route ditaruh SEBELUM Resource
+    Route::put('/orders/{order}/reject', [OrderController::class, 'reject'])->name('orders.reject');
     Route::controller(OrderController::class)->prefix('orders')->name('orders.')->group(function () {
         Route::get('/print-pdf', 'printPdf')->name('printPdf');
         Route::get('/export', 'export')->name('export');

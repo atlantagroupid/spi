@@ -77,67 +77,99 @@ class ApprovalController extends Controller
 
         DB::beginTransaction();
         try {
-            $realData = $approval->approveable;
+            $realData = $approval->approveable; // Menggunakan relasi morphTo
             $action = $approval->action;
 
-            // 1. UPDATE UMUM (Customer, Product, dll)
+            // ======================================================
+            // 1. UPDATE UMUM (Customer, Product, Limit)
+            // ======================================================
             if (in_array($action, ['update', 'update_customer', 'update_product', 'credit_limit_update'])) {
                 if ($realData) $realData->update($approval->new_data);
             }
-            // 2. CREATE DATA (Produk Baru)
-            elseif ($action == 'create' && $approval->model_type == Product::class) {
-                Product::create($approval->new_data);
+
+            // ======================================================
+            // 2. CREATE PRODUK BARU
+            // ======================================================
+            elseif ($action == 'create' && $approval->model_type == \App\Models\Product::class) {
+                \App\Models\Product::create($approval->new_data);
             }
+
+            // ======================================================
             // 3. DELETE DATA
+            // ======================================================
             elseif ($action == 'delete' && $realData) {
                 $realData->delete();
             }
+
+            // ======================================================
             // 4. APPROVE ORDER
+            // ======================================================
             elseif ($action === 'approve_order') {
-                $order = Order::find($approval->model_id);
+                $order = \App\Models\Order::find($approval->model_id);
                 if ($order) {
                     $order->update(['status' => 'approved']);
-                    // Potong Limit jika TOP
+
+                    // Potong Limit Customer jika TOP/Kredit
                     if (in_array($order->payment_type, ['top', 'kredit']) && $order->customer) {
-                        $order->customer->decrement('credit_limit', $order->total_price);
+                        // Pastikan kolom di DB customer bernama 'credit_limit' atau 'credit_limit_quota'
+                        // Sesuaikan dengan nama kolom Anda (misal: limit_quota)
+                        $order->customer->decrement('credit_limit_quota', $order->total_price);
                     }
+
+                    // [PENTING] Catat History Order
+                    $this->recordOrderHistory($order, 'Disetujui', 'Order disetujui via Menu Approval.');
                 }
             }
-            // 5. APPROVE PAYMENT
+
+            // ======================================================
+            // 5. APPROVE PEMBAYARAN (PAYMENT LOG)
+            // ======================================================
             elseif ($action === 'approve_payment') {
-                $log = PaymentLog::find($approval->model_id);
+                $log = \App\Models\PaymentLog::find($approval->model_id);
                 if ($log) {
                     $log->update(['status' => 'approved']);
 
-                    // Cek Pelunasan Order
                     $order = $log->order;
                     if ($order) {
+                        // Hitung total bayar yg sudah diapprove
                         $totalPaid = $order->paymentLogs()->where('status', 'approved')->sum('amount');
-                        $statusData = ($totalPaid >= $order->total_price)
-                            ? ['payment_status' => 'paid', 'status' => 'completed']
-                            : ['payment_status' => 'partial'];
-                        $order->update($statusData);
 
-                        // Kembalikan Limit
+                        // Update status order jika lunas
+                        if ($totalPaid >= $order->total_price) {
+                            $order->update(['payment_status' => 'paid', 'status' => 'completed']);
+                            $this->recordOrderHistory($order, 'Lunas', 'Pembayaran lunas. Order selesai.');
+                        } else {
+                            $order->update(['payment_status' => 'partial']);
+                            $this->recordOrderHistory($order, 'Bayar Partial', 'Pembayaran sebagian diterima.');
+                        }
+
+                        // Kembalikan Limit Customer (Top Up Limit)
                         if (in_array($order->payment_type, ['top', 'kredit']) && $order->customer) {
-                            $order->customer->increment('credit_limit', $log->amount);
+                            $order->customer->increment('credit_limit_quota', $log->amount);
                         }
                     }
                 }
             }
-            // 6. [PENTING] REVISI SURAT JALAN
-            elseif ($action === 'update_delivery_note' && $approval->model_type == Order::class) {
-                $order = Order::find($approval->model_id);
+
+            // ======================================================
+            // 6. REVISI SURAT JALAN (KASIR)
+            // ======================================================
+            elseif ($action === 'update_delivery_note' && $approval->model_type == \App\Models\Order::class) {
+                $order = \App\Models\Order::find($approval->model_id);
                 if ($order) {
                     $order->update([
-                        'delivery_note_file' => $approval->new_data['delivery_note_file'],
-                        'driver_name'        => $approval->new_data['driver_name'] ?? $order->driver_name,
-                        'status'             => 'shipped'
+                        'delivery_proof' => $approval->new_data['delivery_proof'], // Pastikan key array sama
+                        'driver_name'    => $approval->new_data['driver_name'] ?? $order->driver_name,
+                        'status'         => 'shipped'
                     ]);
+
+                    $this->recordOrderHistory($order, 'Revisi SJ Disetujui', 'Revisi surat jalan disetujui Manager.');
                 }
             }
 
-            // Finalisasi Approval
+            // ======================================================
+            // FINALISASI
+            // ======================================================
             $approval->update([
                 'status' => 'approved',
                 'approver_id' => Auth::id(),
@@ -146,9 +178,23 @@ class ApprovalController extends Controller
 
             DB::commit();
             return back()->with('success', 'Permintaan telah DISETUJUI.');
+
         } catch (\Exception $e) {
             DB::rollBack();
-            return back()->with('error', 'Error: ' . $e->getMessage());
+            return back()->with('error', 'Error System: ' . $e->getMessage());
+        }
+    }
+
+    // HELPER: CATAT HISTORY ORDER (Agar timeline di detail order tetap jalan)
+    private function recordOrderHistory($order, $action, $description)
+    {
+        if ($order) {
+            \App\Models\OrderHistory::create([
+                'order_id'    => $order->id,
+                'user_id'     => Auth::id(), // ID Manager yang approve
+                'action'      => $action,
+                'description' => $description
+            ]);
         }
     }
 

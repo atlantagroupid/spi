@@ -33,15 +33,15 @@ class UserQuotaController extends Controller
 
         // Filter: Manager Bisnis hanya melihat request dari Sales
         if ($user->role == 'manager_bisnis') {
-            $pendingRequests = $pendingRequests->filter(function($req) {
-                return in_array($req->user->role, ['sales', 'sales_store', 'sales_field']);
+            $pendingRequests = $pendingRequests->filter(function ($req) {
+                return in_array($req->user->role, ['sales_store', 'sales_field']);
             });
         }
 
         // Manager Ops juga bisa lihat list semua user untuk setting manual (fitur lama Bapak)
         $allUsers = [];
         if ($user->role == 'manager_operasional') {
-            $allUsers = User::whereIn('role', ['manager_bisnis', 'sales', 'sales_store', 'sales_field'])
+            $allUsers = User::whereIn('role', ['manager_bisnis', 'sales_store', 'sales_field'])
                 ->orderBy('role')->get();
         }
 
@@ -73,6 +73,7 @@ class UserQuotaController extends Controller
     // =================================================================
     public function approve(Request $request, $id)
     {
+        /** @var User $manager */
         $manager = Auth::user();
         $quotaReq = QuotaRequest::with('user')->findOrFail($id);
         $amount = $quotaReq->amount;
@@ -97,7 +98,8 @@ class UserQuotaController extends Controller
                 }
 
                 // Potong limit Manager Bisnis (Transfer)
-                $manager->decrement('credit_limit_quota', $amount);
+                $manager->credit_limit_quota -= $amount;
+                $manager->save();
             }
 
             // Cek 2: Manager Ops (Sumber Dana Utama)
@@ -115,7 +117,6 @@ class UserQuotaController extends Controller
 
             DB::commit();
             return back()->with('success', 'Limit berhasil ditambahkan ke ' . $quotaReq->user->name);
-
         } catch (\Exception $e) {
             DB::rollBack();
             return back()->with('error', 'Terjadi kesalahan: ' . $e->getMessage());

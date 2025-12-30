@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 
 class Order extends Model
 {
@@ -17,8 +18,10 @@ class Order extends Model
         'payment_status',
         'due_date',
         'notes',
-        'payment_type', // <--- TAMBAHKAN INI
-        'delivery_proof', // <--- TAMBAHKAN INI (Untuk Kasir)
+        'payment_type',
+        'rejection_note',
+        'delivery_proof', 
+        'driver_name',
     ];
 
     // Tambahkan ini agar due_date dibaca sebagai tanggal (Carbon)
@@ -49,11 +52,30 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
-
-    // --- TAMBAHKAN INI YANG KURANG ---
+    // Relasi untuk mengambil tiket approval terakhir terkait order ini
+    public function latestApproval()
+    {
+        return $this->morphOne(\App\Models\Approval::class, 'model')->latest();
+    }
     // Relasi ke Riwayat Pembayaran (PaymentLog)
     public function paymentLogs()
     {
         return $this->hasMany(PaymentLog::class)->latest();
+    }
+
+    // Relasi ke History
+    public function histories()
+    {
+        return $this->hasMany(OrderHistory::class)->latest();
+    }
+
+    // Fungsi Pembantu Mencatat History
+    public function recordHistory($action, $description = null)
+    {
+        $this->histories()->create([
+            'user_id' => Auth::id(),
+            'action' => $action,
+            'description' => $description
+        ]);
     }
 }

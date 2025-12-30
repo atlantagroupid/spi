@@ -7,7 +7,7 @@ use App\Models\Product;
 use App\Models\Customer;
 use App\Models\OrderItem;
 use App\Models\User;
-use App\Models\Approval; // Penting: Import Model Approval
+use App\Models\Approval;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -18,13 +18,16 @@ class OrderController extends Controller
 {
     use HasImageUpload;
 
-    // 1. TAMPILKAN FORM ORDER
+    // =========================================================================
+    // 1. FORM CREATE ORDER (SALES)
+    // =========================================================================
     public function create()
     {
         $user = Auth::user();
         $query = Customer::orderBy('name');
 
-        if ($user->role === 'sales') {
+        // Filter Customer milik Sales sendiri
+        if (in_array($user->role, ['sales_field', 'sales_store'])) {
             $query->where('user_id', $user->id);
         }
 
@@ -34,10 +37,12 @@ class OrderController extends Controller
         return view('orders.create', compact('customers', 'products'));
     }
 
-    // 2. PROSES SIMPAN ORDER
+    // =========================================================================
+    // 2. SIMPAN ORDER BARU
+    // =========================================================================
     public function store(Request $request)
     {
-        // 1. Validasi Input
+        // A. Validasi
         $isKredit = $request->payment_type === 'kredit';
         $topRule = $isKredit ? 'required|integer|min:1' : 'nullable';
 
@@ -54,7 +59,7 @@ class OrderController extends Controller
         try {
             $customer = Customer::findOrFail($request->customer_id);
 
-            // 2. Hitung Jatuh Tempo
+            // B. Hitung Jatuh Tempo
             $dueDate = now();
             if ($request->payment_type === 'kredit' || $request->payment_type === 'top') {
                 $days = (int) $request->top_days;
@@ -64,14 +69,14 @@ class OrderController extends Controller
                 $dueDate = now()->addDays($days);
             }
 
-            // 3. Create Order Header
+            // C. Buat Header Order
             $order = Order::create([
                 'user_id'        => Auth::id(),
                 'customer_id'    => $customer->id,
                 'invoice_number' => 'SO-' . date('Ymd') . '-' . rand(1000, 9999),
                 'status'         => 'pending_approval',
                 'payment_status' => 'unpaid',
-                'total_price'    => 0,
+                'total_price'    => 0, // Nanti diupdate setelah hitung item
                 'due_date'       => $dueDate,
                 'notes'          => $request->notes,
                 'payment_type'   => $request->payment_type,
@@ -79,14 +84,14 @@ class OrderController extends Controller
 
             $calculatedTotal = 0;
 
-            // 4. Simpan Item & Kurangi Stok
+            // D. Proses Item & Potong Stok
             if ($request->has('product_id')) {
                 $countItems = count($request->product_id);
-
                 for ($i = 0; $i < $countItems; $i++) {
                     $prodId = $request->product_id[$i];
                     $qty    = $request->quantity[$i];
 
+                    // Lock for update untuk mencegah race condition stok
                     $product = Product::where('id', $prodId)->lockForUpdate()->first();
 
                     if ($product) {
@@ -112,21 +117,20 @@ class OrderController extends Controller
 
             $order->update(['total_price' => $calculatedTotal]);
 
-            // 5. Buat Tiket Approval
-            $orderWithItems = $order->load('items.product');
+            // E. Catat History & Tiket Approval
+            $this->recordHistory($order, 'Dibuat', 'Order baru dibuat oleh Sales.');
 
+            $orderWithItems = $order->load('items.product');
             Approval::create([
                 'model_type'    => Order::class,
                 'model_id'      => $order->id,
                 'action'        => 'approve_order',
-                'original_data' => null,
                 'new_data'      => $orderWithItems->toArray(),
                 'status'        => 'pending',
                 'requester_id'  => Auth::id(),
             ]);
 
             DB::commit();
-
             return redirect()->route('orders.show', $order->id)
                 ->with('success', 'Order berhasil dibuat! Menunggu Approval Manager.');
 
@@ -136,24 +140,40 @@ class OrderController extends Controller
         }
     }
 
-    // 3. RIWAYAT ORDER (INDEX)
+    // =========================================================================
+    // 3. DAFTAR RIWAYAT ORDER (INDEX)
+    // =========================================================================
     public function index(Request $request)
     {
-        $salesList = User::where('role', 'sales')->orderBy('name')->get();
+        $salesList = User::whereIn('role', ['sales_field', 'sales_store'])->orderBy('name')->get();
         $query = Order::with(['user', 'customer'])->latest();
 
+        // 1. FILTER KHUSUS SALES (Hanya lihat punya sendiri)
+        if (in_array(Auth::user()->role, ['sales_field', 'sales_store'])) {
+            $query->where('user_id', Auth::id());
+        }
+        // 2. FILTER KHUSUS NON-SALES (Manager, Kasir, Gudang)
+        else {
+            // PERBAIKAN: Sembunyikan order 'rejected' dari list mereka agar bersih
+            $query->where('status', '!=', 'rejected');
+        }
+
+        // Filter Toko
         if ($request->filled('store_name')) {
             $query->whereHas('customer', function ($q) use ($request) {
                 $q->where('name', 'like', '%' . $request->store_name . '%');
             });
         }
 
-        if (Auth::user()->role === 'sales') {
+        // Filter Role Sales (Hanya lihat punya sendiri)
+        if (in_array(Auth::user()->role, ['sales_field', 'sales_store'])) {
             $query->where('user_id', Auth::id());
         } elseif ($request->filled('sales_id')) {
+            // Manager bisa filter berdasarkan sales ID
             $query->where('user_id', $request->sales_id);
         }
 
+        // Filter Tanggal
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('created_at', [
                 $request->start_date . ' 00:00:00',
@@ -161,6 +181,7 @@ class OrderController extends Controller
             ]);
         }
 
+        // Filter Status
         if ($request->filled('status')) {
             $query->where('status', $request->status);
         }
@@ -170,143 +191,103 @@ class OrderController extends Controller
         return view('orders.index', compact('orders', 'salesList'));
     }
 
-    // 4. DETAIL ORDER
+    // =========================================================================
+    // 4. DETAIL ORDER (SHOW)
+    // =========================================================================
     public function show(Order $order)
     {
-        $order->load(['customer', 'items.product', 'paymentLogs']);
-        return view('orders.show', compact('order'));
-    }
+        // Load relasi 'latestApproval' agar kita dapat ID Ticket-nya
+        $order->load(['customer', 'items.product', 'paymentLogs', 'histories.user', 'latestApproval']);
 
-    // 5. MANAGER: APPROVE
-    public function approve(Order $order)
-    {
-        if (!in_array(Auth::user()->role, ['manager_operasional', 'manager_bisnis'])) {
-            abort(403);
-        }
+        // Ambil data approval (jika ada)
+        $approval = $order->latestApproval;
 
-        if ($order->status !== 'pending_approval') {
-            return back()->with('error', 'Status order tidak valid untuk diapprove.');
-        }
-
-        $order->update(['status' => 'approved']);
-
-        Approval::where('model_type', Order::class)
-                ->where('model_id', $order->id)
-                ->where('status', 'pending')
-                ->update(['status' => 'approved']);
-
-        return back()->with('success', 'Order berhasil disetujui!');
-    }
-
-    // 6. MANAGER: REJECT
-    public function reject(Order $order)
-    {
-        if (!in_array(Auth::user()->role, ['manager_operasional', 'manager_bisnis'])) {
-            abort(403);
-        }
-
-        $order->update(['status' => 'rejected']);
-
-        foreach ($order->items as $item) {
-            $item->product->increment('stock', $item->quantity);
-        }
-
-        Approval::where('model_type', Order::class)
-                ->where('model_id', $order->id)
-                ->where('status', 'pending')
-                ->update(['status' => 'rejected']);
-
-        return back()->with('success', 'Order ditolak dan stok dikembalikan.');
+        return view('orders.show', compact('order', 'approval'));
     }
 
     // =========================================================================
-    // 7. [DIPERBAIKI] PROSES UPLOAD SURAT JALAN & REVISI
+    // 5. KASIR: UPLOAD SURAT JALAN & PROSES KIRIM
     // =========================================================================
     public function processOrder(Request $request, $id)
     {
-        // Catatan: Parameter ganti jadi $id agar aman, lalu find manual
         $order = Order::findOrFail($id);
 
-        if (Auth::user()->role !== 'kasir') {
-            abort(403, 'Hanya kasir yang boleh proses pengiriman.');
-        }
+        if (Auth::user()->role !== 'kasir') abort(403);
 
-        // Validasi Input (Sesuai View Modal)
         $request->validate([
             'delivery_proof' => 'required|file|mimes:jpg,jpeg,png,pdf|max:5120',
-            'driver_name'        => 'nullable|string|max:100',
-            'is_revision'        => 'required|boolean'
+            'driver_name'    => 'required|string|max:100', // Wajib diisi
+            'is_revision'    => 'required|boolean'
         ]);
 
-        // Upload File (Pakai Trait user)
+        // Upload File (Akan return path lengkap: delivery_notes/abc.webp)
         $filePath = $this->uploadCompressed(
             $request->file('delivery_proof'),
-            'delivery_notes' // Folder penyimpanan
+            'delivery_notes',
+            $order->delivery_proof // Kirim file lama agar dihapus otomatis
         );
-
-        // --- SKENARIO A: PENGAJUAN REVISI (MASUK APPROVAL) ---
+        // --- SKENARIO A: PENGAJUAN REVISI SURAT JALAN ---
         if ($request->is_revision == '1') {
-
             Approval::create([
                 'model_type'   => Order::class,
                 'model_id'     => $order->id,
                 'requester_id' => Auth::id(),
-                'action'       => 'update_delivery_note', // Action khusus revisi
+                'action'       => 'update_delivery_note',
                 'status'       => 'pending',
                 'new_data'     => [
-                    'invoice_number'     => $order->invoice_number,
                     'delivery_proof' => $filePath,
-                    'driver_name'        => $request->driver_name,
-                    'reason'             => 'Revisi Surat Jalan'
+                    'driver_name'    => $request->driver_name
                 ],
                 'original_data' => [
-                    'delivery_proof' => $order->delivery_proof, // Pastikan kolom ini ada di DB orders
-                    'driver_name'        => $order->driver_name
+                    'delivery_proof' => $order->delivery_proof,
+                    'driver_name'    => $order->driver_name
                 ]
             ]);
 
-            return back()->with('success', 'Permintaan Revisi Surat Jalan berhasil dikirim ke Manager.');
+            $this->recordHistory($order, 'Revisi SJ', 'Kasir mengajukan revisi Surat Jalan.');
+            return back()->with('success', 'Permintaan Revisi Surat Jalan dikirim ke Manager.');
         }
 
-        // --- SKENARIO B: UPLOAD BARU (LANGSUNG UPDATE) ---
+        // SKENARIO B: Langsung Update (Untuk Kasir)
         else {
-            if ($order->status !== 'approved' && $order->status !== 'processed') {
-                return back()->with('error', 'Order belum disetujui Manager.');
+            // Kita izinkan update jika status Approved ATAU Shipped (Buat revisi typo)
+            if (!in_array($order->status, ['approved', 'processed', 'shipped'])) {
+                return back()->with('error', 'Status order tidak valid.');
             }
 
-            // Update Data Order
-            // Pastikan kolom 'delivery_note_file' dan 'driver_name' sudah ada di tabel orders
-            // Jika kolom di DB Anda bernama 'delivery_proof', ubah key array di bawah ini.
             $order->update([
                 'delivery_proof' => $filePath,
-                'driver_name'        => $request->driver_name,
-                'status'             => 'shipped', // Ubah status jadi DIKIRIM
-                // 'payment_status'  => ... (Opsional: biarkan logic pembayaran terpisah)
+                'driver_name'    => $request->driver_name,
+                'status'         => 'shipped',
             ]);
 
-            // Logic tambahan jika Cash langsung Lunas (Opsional, sesuai SOP)
-            if ($order->payment_type == 'cash') {
-                 // $order->update(['status' => 'completed', 'payment_status' => 'paid']);
-            }
+            // [PENTING] Catat History
+            $this->recordHistory($order, 'Dikirim', 'Surat Jalan diterbitkan. Driver: ' . $request->driver_name);
 
-            return back()->with('success', 'Surat Jalan berhasil diupload. Status Order berubah menjadi DIKIRIM.');
+            return back()->with('success', 'Pengiriman diproses!');
         }
     }
 
-    // 8. TAMPILKAN FORM EDIT
+    // =========================================================================
+    // 6. SALES: EDIT FORM (HANYA JIKA PENDING/REJECTED)
+    // =========================================================================
     public function edit($id)
     {
         $order = Order::with('items')->findOrFail($id);
         $user = Auth::user();
 
-        if ($user->role == 'sales' && $order->user_id != $user->id) abort(403);
+        // Cek Hak Akses Sales
+        if (in_array($user->role, ['sales_field', 'sales_store']) && $order->user_id != $user->id) {
+            abort(403);
+        }
 
+        // Cek Status (Hanya boleh edit jika Pending atau Ditolak)
         if (!in_array($order->status, ['pending_approval', 'rejected'])) {
             return back()->with('error', 'Order yang sudah diproses tidak bisa diedit.');
         }
 
         $query = Customer::orderBy('name');
-        if ($user->role === 'sales') {
+        if (in_array($user->role, ['sales_field', 'sales_store'])) {
             $query->where('user_id', $user->id);
         }
         $customers = $query->get();
@@ -315,7 +296,9 @@ class OrderController extends Controller
         return view('orders.edit', compact('order', 'customers', 'products'));
     }
 
-    // 9. UPDATE ORDER
+    // =========================================================================
+    // 7. SALES: UPDATE (AJUKAN ULANG REVISI)
+    // =========================================================================
     public function update(Request $request, $id)
     {
         $order = Order::findOrFail($id);
@@ -331,11 +314,13 @@ class OrderController extends Controller
 
         DB::beginTransaction();
         try {
+            // 1. Kembalikan Stok Lama
             foreach ($order->items as $item) {
                 $item->product->increment('stock', $item->quantity);
             }
             $order->items()->delete();
 
+            // 2. Hitung Ulang & Potong Stok Baru
             $calculatedTotal = 0;
             $countItems = count($request->product_id);
 
@@ -364,38 +349,37 @@ class OrderController extends Controller
                 }
             }
 
-            $updateData = [
-                'total_price' => $calculatedTotal,
-                'notes'       => $request->notes,
-                'status'      => 'pending_approval',
-            ];
+            // 3. Update Header Order
+            $order->update([
+                'total_price'    => $calculatedTotal,
+                'notes'          => $request->notes,
+                'status'         => 'pending_approval', // Reset status jadi Pending
+                'rejection_note' => null // Hapus catatan penolakan lama
+            ]);
 
-            // Handle payment proof update logic if needed...
-
-            $order->update($updateData);
-
+            // 4. Update Approval Ticket
+            $orderWithItems = $order->load('items.product');
             $approval = Approval::where('model_type', Order::class)
                                 ->where('model_id', $order->id)
-                                ->where('status', 'pending')
+                                ->where('status', 'rejected') // Cari yg direject sebelumnya
+                                ->latest()
                                 ->first();
 
-            $orderWithItems = $order->load('items.product');
+            // Buat tiket baru jika yang lama sudah basi
+            Approval::create([
+                'model_type'   => Order::class,
+                'model_id'     => $order->id,
+                'action'       => 'approve_order',
+                'new_data'     => $orderWithItems->toArray(),
+                'status'       => 'pending',
+                'requester_id' => Auth::id(),
+            ]);
 
-            if ($approval) {
-                $approval->update(['new_data' => $orderWithItems->toArray()]);
-            } else {
-                Approval::create([
-                    'model_type'    => Order::class,
-                    'model_id'      => $order->id,
-                    'action'        => 'approve_order',
-                    'new_data'      => $orderWithItems->toArray(),
-                    'status'        => 'pending',
-                    'requester_id'  => Auth::id(),
-                ]);
-            }
+            // 5. Catat History
+            $this->recordHistory($order, 'Revisi', 'Sales memperbaiki order & mengajukan ulang.');
 
             DB::commit();
-            return redirect()->route('orders.show', $order->id)->with('success', 'Order berhasil diperbarui.');
+            return redirect()->route('orders.show', $order->id)->with('success', 'Order diperbarui & diajukan ulang.');
 
         } catch (\Exception $e) {
             DB::rollBack();
@@ -403,7 +387,9 @@ class OrderController extends Controller
         }
     }
 
-    // 10. KONFIRMASI BARANG SAMPAI
+    // =========================================================================
+    // 8. KONFIRMASI BARANG TIBA (DELIVERED/COMPLETED)
+    // =========================================================================
     public function confirmArrival(Request $request, $id)
     {
         $order = Order::findOrFail($id);
@@ -418,10 +404,15 @@ class OrderController extends Controller
         }
 
         $order->update(['status' => $newStatus]);
+
+        $this->recordHistory($order, 'Sampai', 'Barang dikonfirmasi telah sampai di lokasi.');
+
         return back()->with('success', 'Barang dikonfirmasi diterima.');
     }
 
-    // 11. EXPORT PDF INVOICE
+    // =========================================================================
+    // 9. EXPORT PDF
+    // =========================================================================
     public function exportPdf($id)
     {
         $order = Order::with(['customer', 'items.product', 'user'])->findOrFail($id);
@@ -429,14 +420,31 @@ class OrderController extends Controller
         return $pdf->download('Invoice-' . $order->invoice_number . '.pdf');
     }
 
-    // 12. EXPORT PDF LIST
     public function exportListPdf(Request $request)
     {
-        // (Logika Filter sama seperti Index...)
         $query = Order::with(['user', 'customer'])->latest();
-        // ... (Include filter logic here if needed) ...
+        // (Tambahkan logika filter yang sama dengan index jika diperlukan)
         $orders = $query->get();
         $pdf = Pdf::loadView('orders.pdf_list', compact('orders'));
         return $pdf->download('laporan-order-' . date('Y-m-d') . '.pdf');
+    }
+
+    // =========================================================================
+    // HELPER: RECORD HISTORY (JIKA MODEL BELUM ADA FUNGSI INI)
+    // =========================================================================
+    private function recordHistory($order, $action, $description = null)
+    {
+        // Cek apakah model Order punya fungsi recordHistory
+        if (method_exists($order, 'recordHistory')) {
+            $order->recordHistory($action, $description);
+        } else {
+            // Fallback manual jika Model belum diupdate
+            \App\Models\OrderHistory::create([
+                'order_id'    => $order->id,
+                'user_id'     => Auth::id(),
+                'action'      => $action,
+                'description' => $description
+            ]);
+        }
     }
 }

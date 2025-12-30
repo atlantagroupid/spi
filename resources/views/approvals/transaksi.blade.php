@@ -72,9 +72,9 @@
                                         </a>
 
                                         {{-- 2. TOMBOL REVIEW (Kaca Pembesar Biru Tua) --}}
-                                        <button type="button" class="btn btn-primary btn-sm fw-bold btn-review"
-                                            data-id="{{ $item->id }}" title="Review Approval">
-                                            <i class="bi bi-search me-1"></i> Review
+                                        <button class="btn btn-sm btn-primary btn-review" data-id="{{ $item->id }}"
+                                            data-order-id="{{ $item->model_id }}"> {{-- <--- INI WAJIB ADA --}}
+                                            <i class="bi bi-search"></i> Review
                                         </button>
                                     </div>
                                 </td>
@@ -104,50 +104,44 @@
 
                 <div class="modal-body p-0" id="modalContent"></div>
 
-                <div class="modal-footer bg-light d-flex justify-content-between">
-                    <button type="button" class="btn btn-secondary" id="btnCloseModal" data-dismiss="modal"
-                        data-bs-dismiss="modal">Tutup</button>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>
 
-                    <div class="d-flex gap-2">
-                        <form id="formRejectTrx" action="" method="POST">
-                            @csrf @method('PUT')
-                            <input type="hidden" name="reason" id="reasonTrx">
-                            <button type="button" id="btnRejectAction" class="btn btn-danger">Tolak</button>
-                        </form>
-
-                        <form id="formApproveTrx" action="" method="POST">
-                            @csrf @method('PUT')
-                            <button type="button" id="btnApproveAction" class="btn btn-success">Setujui</button>
-                        </form>
-                    </div>
+                    {{-- Tombol ini yang akan membawa Manager ke halaman Detail Order untuk eksekusi --}}
+                    <a href="#" id="btnShowDetail" class="btn btn-primary fw-bold shadow-sm">
+                        <i class="bi bi-eye-fill me-1"></i> Lihat Detail & Eksekusi
+                    </a>
                 </div>
             </div>
         </div>
     </div>
 @endsection
-
 @push('scripts')
     <script>
-        // 1. SCRIPT MANUAL UNTUK TOMBOL TUTUP
-        $('#btnCloseModal').on('click', function() {
-            $('#modalReview').modal('hide');
-        });
-
-        // 2. LOAD DATA MODAL
+        // EVENT SAAT TOMBOL "REVIEW" DIKLIK
         $(document).on('click', '.btn-review', function() {
-            let id = $(this).data('id');
-            let urlDetail = "{{ route('approvals.detail', 0) }}".replace('/0', '/' + id);
-            let urlApprove = "{{ route('approvals.approve', 0) }}".replace('/0', '/' + id);
-            let urlReject = "{{ route('approvals.reject', 0) }}".replace('/0', '/' + id);
+            let id = $(this).data('id'); // ID Tiket Approval
+            let orderId = $(this).data('order-id'); // ID Order (Wajib ada di tombol tabel)
 
-            $('#formApproveTrx').attr('action', urlApprove);
-            $('#formRejectTrx').attr('action', urlReject);
+            // 1. URL untuk konten ringkasan modal (AJAX)
+            // Pastikan route ini sesuai dengan route di web.php untuk ambil detail approval
+            let urlDetail = "{{ route('approvals.detail', ':id') }}".replace(':id', id);
 
+            // 2. URL untuk tombol "Lihat Detail & Eksekusi"
+            // Kita tambah parameter ?source=approval agar tombol Approve/Reject muncul di sana
+            let urlOrderShow = "{{ route('orders.show', ':id') }}";
+            urlOrderShow = urlOrderShow.replace(':id', orderId) + "?source=approval";
+
+            // 3. Update Link Tombol di Footer Modal
+            $('#btnShowDetail').attr('href', urlOrderShow);
+
+            // 4. Tampilkan Loading & Buka Modal
             $('#modalContent').html(
-                '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Loading data transaksi...</p></div>'
+                '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p class="mt-2">Memuat ringkasan...</p></div>'
             );
             $('#modalReview').modal('show');
 
+            // 5. Ambil Data Ringkasan via AJAX
             $.get(urlDetail, function(data) {
                 $('#modalContent').html(data);
             }).fail(function() {
@@ -155,46 +149,9 @@
             });
         });
 
-        // 3. LOGIKA APPROVE
-        $('#btnApproveAction').on('click', function(e) {
-            e.preventDefault();
-            Swal.fire({
-                title: 'Setujui Transaksi Ini?',
-                text: "Status order akan berubah menjadi Disetujui (Approved).",
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonColor: '#1cc88a',
-                cancelButtonColor: '#858796',
-                confirmButtonText: 'Ya, Setujui!',
-                cancelButtonText: 'Batal'
-            }).then((result) => {
-                if (result.isConfirmed) $('#formApproveTrx').submit();
-            });
-        });
-
-        // 4. LOGIKA REJECT
-        $('#btnRejectAction').on('click', function(e) {
-            e.preventDefault();
-            Swal.fire({
-                title: 'Tolak Transaksi?',
-                text: "Harap masukkan alasan penolakan:",
-                icon: 'warning',
-                input: 'text',
-                inputPlaceholder: 'Contoh: Harga salah / Stok habis',
-                showCancelButton: true,
-                confirmButtonColor: '#e74a3b',
-                cancelButtonColor: '#858796',
-                confirmButtonText: 'Tolak Data',
-                cancelButtonText: 'Batal',
-                inputValidator: (value) => {
-                    if (!value) return 'Anda wajib mengisi alasan penolakan!'
-                }
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $('#reasonTrx').val(result.value);
-                    $('#formRejectTrx').submit();
-                }
-            });
+        // Manual Close (Jaga-jaga jika tombol X tidak jalan)
+        $('#btnCloseModal').on('click', function() {
+            $('#modalReview').modal('hide');
         });
     </script>
 @endpush

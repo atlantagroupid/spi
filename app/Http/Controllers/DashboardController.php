@@ -11,321 +11,270 @@ use App\Models\User;
 use App\Models\Approval;
 use App\Models\Visit;
 use App\Models\PaymentLog;
+use App\Models\OrderItem;
 
 class DashboardController extends Controller
 {
     public function index()
     {
-        // >>> JALANKAN AUTO CUTOFF SEBELUM MEMUAT DASHBOARD <<<
-        \App\Models\Visit::runAutoCutoff();
-
+        Visit::runAutoCutoff();
         $user = Auth::user();
         $role = $user->role;
 
-        // --- 1. INITIALIZE VARIABLES (Nilai Default agar tidak error undefined) ---
-        $achieved = 0;
-        $target = 0;
-        $percentage = 0;
-        $todayVisits = 0;
-        $visitTarget = 0;
-        $visitPercentage = 0;
-        $plannedVisits = [];
-        $recentOrders = [];
-        $incomingGoodsToday = collect();
-        $outgoingGoodsToday = collect();
-
-        $warehouseStats = [];
-        $todayOrders = 0;
-        $totalOrders = 0;
-        $totalRevenue = 0;
-        $cashReceived = 0;
-        $totalReceivable = 0;
-        $pendingApprovalCount = 0;
-        $lowStockCount = 0;
-
-        $chartLabels = [];
-        $chartData = [];
-        $topSales = [];
-        $salesNames = [];
-        $salesRevenue = [];
-        $salesUser = $user; // Default diri sendiri
-        $currentOmset = 0;
-        $allSales = [];
-
-        // Default variable
-        $limitQuota = 0;
-        $usedCredit = 0;
-        $remaining = 0;
-        $isCritical = false; // Trigger warning
-
-        // ===================================================
-        // A. LOGIKA KHUSUS SALES
-        // ===================================================
-        if ($role === 'sales_field' || $role === 'sales_store') {
-            // 1. Target Omset
-            $target = $user->monthly_sales_target ?? 0;
-
-            // Hitung Omset
-            $achieved = Order::where('user_id', $user->id)
-                ->whereIn('status', ['approved', 'completed', 'shipped'])
-                ->whereMonth('created_at', date('m'))
-                ->whereYear('created_at', date('Y'))
-                ->sum('total_price');
-
-            $currentOmset = $achieved; // Mapping agar sesuai nama variabel di view
-            $percentage = ($target > 0) ? ($achieved / $target) * 100 : 0;
-
-            // 2. Target Kunjungan
-            $visitTarget = $user->daily_visit_target ?? 5;
-
-            $todayVisits = Visit::where('user_id', $user->id)
-                ->whereDate('created_at', date('Y-m-d'))
-                ->where('status', 'completed')
-                ->count();
-
-            $visitPercentage = ($visitTarget > 0) ? ($todayVisits / $visitTarget) * 100 : 0;
-
-            // 3. Rencana Kunjungan
-            $plannedVisits = Visit::with('customer')
-                ->where('user_id', $user->id)
-                ->whereDate('created_at', date('Y-m-d'))
-                ->get();
-
-            // 4. Riwayat Order
-            $recentOrders = Order::with('customer')
-                ->where('user_id', $user->id)
-                ->latest()
-                ->take(5)
-                ->get();
-
-            // 5. Grafik Penjualan Bulanan (PRIBADI SALES)
-            $salesData = Order::select(
-                DB::raw('SUM(total_price) as total'),
-                DB::raw('MONTH(created_at) as month')
-            )
-                ->where('user_id', $user->id) // <--- PENTING: Filter punya sales sendiri
-                ->whereYear('created_at', date('Y'))
-                ->whereIn('status', ['approved', 'completed', 'shipped'])
-                ->groupBy('month')
-                ->pluck('total', 'month')
-                ->toArray();
-
-            // Siapkan data untuk Chart.js
-            $chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-            $chartData = [];
-            for ($i = 1; $i <= 12; $i++) {
-                $chartData[] = $salesData[$i] ?? 0;
-            }
+        // 1. SALES (Tetap)
+        if (in_array($role, ['sales_field', 'sales_store'])) {
+            return $this->dashboardSales($user);
         }
 
-        // ===================================================
-        // B. LOGIKA KHUSUS MANAGER / ADMIN / GUDANG
-        // ===================================================
-        else {
-            // --- LOGIC DROPDOWN SALES (Untuk Modal Edit Target di Manager) ---
-            $allSales = User::whereIn('role', ['sales_field', 'sales_store'])
-                ->get();
-            // Logic Dashboard Manager lihat Sales tertentu (Opsional)
-            if (request('sales_id') && in_array($user->role, ['manager_bisnis', 'manager_operasional'])) {
-                $salesUser = User::find(request('sales_id'));
-            }
-
-            // 1. Statistik Gudang
-            $warehouseStats = [
-                'total_items' => Product::sum('stock'),
-                'total_asset' => Product::sum(DB::raw('price * stock')),
-                'low_stock'   => Product::where('stock', '<=', 50)->count(),
-            ];
-            $lowStockCount = $warehouseStats['low_stock'];
-
-            // 2. Statistik Transaksi
-            $todayOrders = Order::whereDate('created_at', date('Y-m-d'))->count();
-            $totalOrders = Order::count();
-
-            // 3. Keuangan
-            $totalRevenue = Order::whereIn('status', ['approved', 'shipped', 'completed'])->sum('total_price');
-            $cashReceived = PaymentLog::where('status', 'approved')->sum('amount');
-            // Sisa Piutang = Total Jual - Uang Masuk
-            $totalReceivable = $totalRevenue - $cashReceived;
-
-            // 4. Notifikasi Approval
-            $queryApp = Approval::where('status', 'pending');
-
-            if ($role === 'kepala_gudang') {
-
-                $queryApp->where('model_type', 'App\Models\Product');
-            } elseif ($role === 'manager_bisnis') {
-                $queryApp->whereIn('model_type', [
-                    'App\Models\Customer',
-                    'App\Models\Order',
-                    'App\Models\PaymentLog'
-                ]);
-            }
-
-            $pendingApprovalCount = $queryApp->count();
-
-            // --- KHUSUS KEPALA GUDANG ---
-            if ($role === 'kepala_gudang') {
-                // 1. Barang Masuk Hari Ini (Produk baru yang diapprove hari ini)
-                $incomingGoodsToday = Approval::where('model_type', \App\Models\Product::class)
-                    ->where('action', 'create')
-                    ->where('status', 'approved')
-                    ->whereDate('updated_at', today())
-                    ->get();
-
-                // 2. Barang Keluar Hari Ini (Dari order yang diproses/shipped hari ini)
-                $outgoingGoodsToday = \App\Models\OrderItem::with(['product', 'order'])
-                    ->whereHas('order', function ($query) {
-                        $query->whereIn('status', ['shipped', 'completed'])
-                            ->whereDate('updated_at', today());
-                    })
-                    ->get();
-            }
-
-            // 5. Grafik Penjualan
-            $salesData = Order::select(
-                DB::raw('SUM(total_price) as total'),
-                DB::raw('MONTH(created_at) as month')
-            )
-                ->whereYear('created_at', date('Y'))
-                ->whereIn('status', ['approved', 'shipped', 'completed'])
-                ->groupBy('month')
-                ->pluck('total', 'month')
-                ->toArray();
-
-            $chartLabels = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-            for ($i = 1; $i <= 12; $i++) {
-                $chartData[] = $salesData[$i] ?? 0;
-            }
-
-            // 6. Top Sales (Leaderboard)
-            if (in_array($role, ['manager_operasional', 'manager_bisnis'])) {
-                $topSales = User::where('role', ['sales_field', 'sales_store'])
-                    ->withCount(['visits' => function ($q) {
-                        $q->whereMonth('created_at', date('m'));
-                    }])
-                    ->withSum(['orders' => function ($q) {
-                        $q->whereIn('status', ['approved', 'shipped', 'completed'])
-                            ->whereMonth('created_at', date('m'));
-                    }], 'total_price')
-                    ->orderByDesc('orders_sum_total_price')
-                    ->take(5)
-                    ->get();
-
-                foreach ($topSales as $s) {
-                    $salesNames[] = $s->name;
-                    $salesRevenue[] = $s->orders_sum_total_price ?? 0;
-                }
-            }
+        // 2. MANAGER (Tetap - View Global)
+        if (in_array($role, ['manager_operasional', 'manager_bisnis'])) {
+            return $this->dashboardManager($user);
         }
 
-        // ===================================================
-        // C. RETURN VIEW (INI YANG DIKEMBALIKAN KE 'dashboard')
-        // ===================================================
+        // 3. GUDANG (Kepala & Admin)
+        if (in_array($role, ['kepala_gudang', 'admin_gudang'])) {
+            return $this->dashboardGudang($user);
+        }
 
-        // Perbaikan: Kembalikan SEMUA role ke view 'dashboard' utama
-        // agar logika di dalam view (blade) yang mengatur tampilannya.
+        // 4. FINANCE & KASIR (BARU)
+        if (in_array($role, ['finance', 'kasir'])) {
+            return $this->dashboardFinance($user);
+        }
 
+        // Default Fallback
+        return view('dashboard.index_non_sales', compact('user'));
+    }
 
-        // ==========================================================
-        // 1. DATA UNTUK GRAFIK BULANAN (Chart)
-        // ==========================================================
-        $chartQuery = \App\Models\Order::selectRaw('MONTH(created_at) as month, SUM(total_price) as total')
+    /**
+     * -------------------------------------------------------------------------
+     * LOGIC DASHBOARD KHUSUS SALES
+     * -------------------------------------------------------------------------
+     */
+    private function dashboardSales($user)
+    {
+        // 1. Target & Omset (Bulanan)
+        $targetOmset = $user->sales_target ?? 0; // Pastikan kolom ini ada di tabel users
+
+        $currentOmset = Order::where('user_id', $user->id)
+            ->whereIn('status', ['approved', 'completed', 'shipped'])
+            ->whereMonth('created_at', date('m'))
             ->whereYear('created_at', date('Y'))
-            ->where('payment_status', 'paid'); // Hanya hitung yang LUNAS
+            ->sum('total_price');
 
-        // Logika Pintar:
-        // Kalau Manager -> Lihat omset TOTAL Perusahaan
-        // Kalau Sales   -> Lihat omset DIA SENDIRI (Biar tau performa pribadi)
-        if ($user->role == ['sales_field', 'sales_store']) {
-            $chartQuery->where('user_id', $user->id);
-        }
+        $omsetPercentage = ($targetOmset > 0) ? ($currentOmset / $targetOmset) * 100 : 0;
 
-        $salesData = $chartQuery->groupBy('month')->pluck('total', 'month')->toArray();
+        // 2. Target Visit (Harian)
+        $visitTarget = $user->daily_visit_target ?? 5;
 
-        // Siapkan array data 12 bulan (Jan-Des)
-        $chartArray = [];
-        for ($i = 1; $i <= 12; $i++) {
-            $chartArray[] = $salesData[$i] ?? 0;
-        }
+        $todayVisits = Visit::where('user_id', $user->id)
+            ->whereDate('created_at', date('Y-m-d'))
+            ->where('status', 'completed')
+            ->count();
 
+        $visitPercentage = ($visitTarget > 0) ? ($todayVisits / $visitTarget) * 100 : 0;
 
-        // ==========================================================
-        // 2. DATA LEADERBOARD & EFEKTIVITAS (Tabel Bawah)
-        // ==========================================================
-        // PENTING: Ini kita buka untuk SEMUA ROLE biar Sales bisa lihat saingannya
-
-        $topSales = \App\Models\User::where('role', ['sales_field', 'sales_store']) // Ambil hanya user sales
-            ->withSum(['orders' => function ($q) {
-                $q->where('payment_status', 'paid'); // Hitung total order lunas
-            }], 'total_price')
-            ->withCount('visits') // Hitung jumlah check-in kunjungan
-            ->orderByDesc('orders_sum_total_price') // Urutkan dari omset tertinggi
-            ->take(5) // Ambil 5 besar
+        // 3. Rencana Kunjungan Hari Ini
+        $plannedVisits = Visit::with('customer')
+            ->where('user_id', $user->id)
+            ->whereDate('created_at', date('Y-m-d'))
             ->get();
 
+        // 4. Plafon Kredit (Sisa Limit)
+        $limitQuota = $user->credit_limit_quota ?? 0;
+        $usedCredit = 0;
+        $remaining = 0;
+        $isCritical = false;
 
-        // Cek Role Sales/Manager Bisnis
-        if (in_array($user->role, ['sales_store', 'sales_field', 'manager_bisnis'])) {
-
-            // 1. Ambil Limit dari Database
-            $limitQuota = $user->credit_limit_quota;
-
-            // 2. Hitung yang sudah terpakai (Total Piutang Belum Lunas)
-            // Ambil order yg belum lunas milik user ini
-            $orders = \App\Models\Order::where('id', $user->id) // atau user_id tergantung relasi bapak
-                ->whereIn('payment_type', ['top', 'kredit']) // Hanya yg makan limit
-                ->where('payment_status', '!=', 'paid')      // Belum lunas
-                ->where('status', '!=', 'cancelled')         // Order aktif
-                ->where('status', '!=', 'rejected')
+        if ($limitQuota > 0) {
+            // Hitung Order yg pakai limit (TOP/Kredit) dan belum lunas
+            $unpaidOrders = Order::where('user_id', $user->id) // FIX: Pakai user_id bukan id
+                ->whereIn('payment_type', ['top', 'kredit'])
+                ->where('payment_status', '!=', 'paid')
+                ->whereNotIn('status', ['cancelled', 'rejected'])
                 ->get();
 
-            foreach ($orders as $o) {
-                // Rumus: Total Harga Order - (Yang sudah dibayar/dicicil)
+            foreach ($unpaidOrders as $o) {
                 $paidAmount = $o->paymentLogs->where('status', 'approved')->sum('amount');
                 $usedCredit += ($o->total_price - $paidAmount);
             }
 
-            // 3. Hitung Sisa
             $remaining = $limitQuota - $usedCredit;
-
-            // 4. Logika Warning (Jika Sisa < 20% dari Limit)
-            if ($limitQuota > 0) {
-                $percentageRemaining = ($remaining / $limitQuota) * 100;
-                if ($percentageRemaining < 20) {
-                    $isCritical = true;
-                }
-            } else {
-                // Jika limit 0 tapi ada pemakaian, berarti minus/critical
-                if ($usedCredit > 0) $isCritical = true;
+            // Warning jika sisa kurang dari 20%
+            if (($remaining / $limitQuota) * 100 < 20) {
+                $isCritical = true;
             }
         }
-        return view('dashboard', compact(
-            'limitQuota',
-            'usedCredit',
-            'remaining',
-            'isCritical',
-            'todayVisits',
-            'visitTarget',
-            'visitPercentage',
+
+        // 5. Grafik Kinerja Pribadi (12 Bulan)
+        $chartData = $this->getMonthlyChartData($user->id); // Panggil Helper Bawah
+
+        // LEMPAR KE VIEW KHUSUS SALES
+        return view('dashboard.index_sales', compact(
+            'user',
+            'targetOmset', 'currentOmset', 'omsetPercentage',
+            'visitTarget', 'todayVisits', 'visitPercentage',
             'plannedVisits',
-            'currentOmset',
-            'recentOrders',
-            'salesUser',
-            'chartLabels',
-            'chartData',
+            'limitQuota', 'usedCredit', 'remaining', 'isCritical',
+            'chartData'
+        ));
+    }
+
+    /**
+     * -------------------------------------------------------------------------
+     * LOGIC DASHBOARD KHUSUS MANAGER
+     * -------------------------------------------------------------------------
+     */
+    private function dashboardManager($user)
+    {
+        // 1. Statistik Global Keuangan
+        $totalRevenue = Order::whereIn('status', ['approved', 'shipped', 'completed'])->sum('total_price');
+        $cashReceived = PaymentLog::where('status', 'approved')->sum('amount');
+        $totalReceivable = $totalRevenue - $cashReceived;
+
+        // 2. Statistik Gudang s
+        $warehouseAsset = Product::sum(DB::raw('price * stock'));
+        $totalItems = Product::sum('stock');
+        $lowStockCount = Product::where('stock', '<=', 50)->count();
+
+        // Bungkus dalam array agar cocok dengan view index_manager.blade.php
+        $warehouseStats = [
+            'total_items' => $totalItems,
+            'total_asset' => $warehouseAsset,
+            'low_stock'   => $lowStockCount
+        ];
+
+        // 3. Approval Pending
+        $pendingApprovalCount = Approval::where('status', 'pending')->count();
+
+        // 4. Leaderboard Sales
+        $topSales = User::whereIn('role', ['sales_field', 'sales_store'])
+            ->withSum(['orders' => function ($q) {
+                $q->whereIn('status', ['approved', 'shipped', 'completed'])
+                  ->whereMonth('created_at', date('m'));
+            }], 'total_price')
+            ->orderByDesc('orders_sum_total_price')
+            ->take(5)
+            ->get();
+
+        // 5. Grafik Global
+        $chartData = $this->getMonthlyChartData(null);
+
+        return view('dashboard.index_manager', compact(
+            'user',
+            'totalRevenue', 'cashReceived', 'totalReceivable',
+            'warehouseAsset', 'lowStockCount',
             'warehouseStats',
             'pendingApprovalCount',
-            'lowStockCount',
-            'totalRevenue',
-            'cashReceived',
-            'totalReceivable',
             'topSales',
-            'salesNames',
-            'salesRevenue',
-            'allSales',
-            'incomingGoodsToday',
-            'outgoingGoodsToday'
+            'chartData'
         ));
+    }
+
+    /**
+     * LOGIC DASHBOARD GUDANG (UPDATED)
+     * Admin Gudang tidak boleh lihat Rupiah (Nilai Aset)
+     */
+    private function dashboardGudang($user)
+    {
+        // Statistik Fisik (Aman untuk Admin)
+        $totalItems = Product::sum('stock');
+        $lowStockCount = Product::where('stock', '<=', 50)->count();
+
+        // Statistik Keuangan (Hanya untuk Kepala Gudang & Manager)
+        $totalAsset = 0;
+        $showFinancials = false; // Default Admin gak boleh lihat
+
+        if ($user->role === 'kepala_gudang' || $user->role === 'manager_operasional') {
+            $totalAsset = Product::sum(DB::raw('price * stock'));
+            $showFinancials = true;
+        }
+
+        // Barang Masuk/Keluar
+        $incomingGoods = Approval::where('model_type', Product::class)
+            ->where('status', 'approved')
+            ->whereDate('updated_at', today())
+            ->count();
+
+        $outgoingGoods = Order::where('status', 'shipped')
+            ->whereDate('updated_at', today())
+            ->count();
+
+        $pendingApproval = Approval::where('model_type', Product::class)
+            ->where('status', 'pending')
+            ->count();
+
+        return view('dashboard.index_gudang', compact(
+            'user',
+            'totalItems', 'lowStockCount',
+            'totalAsset', 'showFinancials', // Kirim flag ini ke view
+            'incomingGoods', 'outgoingGoods', 'pendingApproval'
+        ));
+    }
+
+    /**
+     * LOGIC DASHBOARD FINANCE (BARU)
+     */
+    private function dashboardFinance($user)
+    {
+        // 1. Uang Masuk Hari Ini (Cash flow harian penting buat Finance)
+        $cashToday = PaymentLog::where('status', 'approved')
+            ->whereDate('payment_date', today())
+            ->sum('amount');
+
+        // 2. Total Piutang (Receivables)
+        $allOrders = Order::whereIn('status', ['approved', 'shipped', 'completed'])->sum('total_price');
+        $allPaid = PaymentLog::where('status', 'approved')->sum('amount');
+        $totalReceivable = $allOrders - $allPaid;
+
+        // 3. Menunggu Konfirmasi Pembayaran
+        $pendingPayments = PaymentLog::where('status', 'pending')->count();
+
+        // 4. Pengajuan TOP/Limit Baru (Jika Finance ikut approval)
+        $pendingLimit = \App\Models\QuotaRequest::where('status', 'pending')->count();
+
+        // 5. 5 Transaksi Terakhir (Semua Sales)
+        $recentTransactions = PaymentLog::with(['order.customer', 'user']) // User disini adalah yang input bayar (Sales)
+            ->where('status', 'approved')
+            ->latest()
+            ->take(5)
+            ->get();
+
+        return view('dashboard.index_finance', compact(
+            'user',
+            'cashToday', 'totalReceivable',
+            'pendingPayments', 'pendingLimit',
+            'recentTransactions'
+        ));
+    }
+
+    /**
+     * -------------------------------------------------------------------------
+     * HELPER: GENERATE CHART DATA
+     * -------------------------------------------------------------------------
+     */
+    private function getMonthlyChartData($userId = null)
+    {
+        $query = Order::select(
+            DB::raw('SUM(total_price) as total'),
+            DB::raw('MONTH(created_at) as month')
+        )
+        ->whereYear('created_at', date('Y'))
+        ->whereIn('status', ['approved', 'shipped', 'completed'])
+        ->groupBy('month');
+
+        // Jika ada User ID, filter punya dia saja (untuk Sales Dashboard)
+        if ($userId) {
+            $query->where('user_id', $userId);
+        }
+
+        $results = $query->pluck('total', 'month')->toArray();
+
+        // Format array [100, 200, 0, ...] untuk 12 bulan
+        $data = [];
+        for ($i = 1; $i <= 12; $i++) {
+            $data[] = $results[$i] ?? 0;
+        }
+
+        return $data;
     }
 }

@@ -1,194 +1,158 @@
 @extends('layouts.app')
+
 @section('title', 'Edit Order #' . $order->invoice_number)
 
 @section('content')
-    <div class="card shadow border-0">
-        <div class="card-header bg-warning text-dark">
-            <h6 class="mb-0 fw-bold"><i class="bi bi-pencil-square"></i> Revisi Order</h6>
-        </div>
-        <div class="card-body">
-            <form action="{{ route('orders.update', $order->id) }}" method="POST">
-                @csrf
-                @method('PUT') {{-- Wajib untuk Update --}}
+<div class="container pb-5">
 
-                {{-- Info Customer --}}
-                <div class="mb-3">
-                    <label class="form-label">Customer</label>
-                    <select name="customer_id" class="form-select" required>
-                        @foreach ($customers as $c)
-                            <option value="{{ $c->id }}" {{ $order->customer_id == $c->id ? 'selected' : '' }}>
-                                {{ $c->name }}
-                            </option>
-                        @endforeach
-                    </select>
+    {{-- HEADER --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-primary mb-1">Revisi Order</h4>
+            <p class="text-muted small mb-0">Perbaiki pesanan yang ditolak dan ajukan ulang.</p>
+        </div>
+        <a href="{{ route('orders.show', $order->id) }}" class="btn btn-secondary btn-sm shadow-sm">
+            <i class="bi bi-arrow-left me-1"></i> Batal & Kembali
+        </a>
+    </div>
+
+    {{-- ALERT ERROR (PENTING AGAR TAHU KENAPA MENTAL) --}}
+    @if ($errors->any())
+        <div class="alert alert-danger shadow-sm border-start border-5 border-danger">
+            <ul class="mb-0 small">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger shadow-sm">{{ session('error') }}</div>
+    @endif
+
+    <form action="{{ route('orders.update', $order->id) }}" method="POST">
+        @csrf
+        @method('PUT') {{-- WAJIB ADA UNTUK UPDATE --}}
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+
+                {{-- INFO CUSTOMER (READONLY) --}}
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small text-muted">Customer</label>
+                        <input type="text" class="form-control bg-light" value="{{ $order->customer->name }}" readonly>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label fw-bold small text-muted">Invoice</label>
+                        <input type="text" class="form-control bg-light" value="{{ $order->invoice_number }}" readonly>
+                    </div>
                 </div>
 
-                {{-- Area Produk (Dynamic Input) --}}
-                <div class="mb-3">
-                    <label class="form-label fw-bold">Daftar Produk</label>
-                    <div id="product-container">
-                        {{-- LOOPING ITEM YANG SUDAH ADA --}}
-                        @foreach ($order->items as $index => $item)
-                            <div class="row g-2 mb-2 product-row">
-                                <div class="col-7">
-                                    <select name="products[]" class="form-select form-select-sm" required>
-                                        <option value="">Pilih Produk</option>
-                                        @foreach ($products as $p)
-                                            <option value="{{ $p->id }}"
-                                                {{ $item->product_id == $p->id ? 'selected' : '' }}>
-                                                {{ $p->name }} (Stok: {{ $p->stock }})
-                                            </option>
-                                        @endforeach
-                                    </select>
-                                </div>
-                                <div class="col-3">
-                                    <input type="number" name="quantities[]" class="form-control form-control-sm"
-                                        placeholder="Qty" value="{{ $item->quantity }}" min="1" required>
-                                </div>
-                                <div class="col-2">
-                                    <button type="button" class="btn btn-danger btn-sm w-100 remove-row">
-                                        <i class="bi bi-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
+                <hr class="my-4">
 
-                    <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="add-product-btn">
-                        <i class="bi bi-plus-circle"></i> Tambah Produk Lain
+                {{-- FORM ITEM BARANG --}}
+                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-box-seam me-2"></i>Daftar Item Barang</h6>
+
+                <div id="product-list">
+                    {{-- LOOP BARANG LAMA --}}
+                    @foreach($order->items as $index => $item)
+                        <div class="row g-2 mb-2 product-row align-items-end">
+                            <div class="col-md-7">
+                                <label class="small text-muted mb-1">Pilih Produk</label>
+                                <select name="product_id[]" class="form-select select2-product" required>
+                                    <option value="" disabled>-- Pilih Produk --</option>
+                                    @foreach($products as $product)
+                                        <option value="{{ $product->id }}"
+                                            data-price="{{ $product->price }}"
+                                            {{ $product->id == $item->product_id ? 'selected' : '' }}>
+                                            {{ $product->name }} (Stok: {{ $product->stock + ($product->id == $item->product_id ? $item->quantity : 0) }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <label class="small text-muted mb-1">Qty</label>
+                                <input type="number" name="quantity[]" class="form-control" min="1" value="{{ $item->quantity }}" required placeholder="Jml">
+                            </div>
+                            <div class="col-md-2">
+                                <button type="button" class="btn btn-danger w-100 btn-remove-row">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- TOMBOL TAMBAH BARIS --}}
+                <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="add-product-btn">
+                    <i class="bi bi-plus-circle me-1"></i> Tambah Baris Barang
+                </button>
+
+                <hr class="my-4">
+
+                {{-- CATATAN --}}
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-muted">Catatan Revisi</label>
+                    <textarea name="notes" class="form-control" rows="3" placeholder="Tulis catatan tambahan untuk Manager...">{{ $order->notes }}</textarea>
+                </div>
+
+                {{-- TOMBOL SUBMIT --}}
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary fw-bold py-2">
+                        <i class="bi bi-save me-1"></i> SIMPAN PERUBAHAN & AJUKAN ULANG
                     </button>
                 </div>
 
-                <div class="mb-3">
-                    <label class="form-label">Catatan Revisi</label>
-                    <textarea name="notes" class="form-control" rows="2">{{ $order->notes }}</textarea>
-                </div>
-
-                <div class="d-grid gap-2">
-                    <button type="submit" class="btn btn-primary">Simpan & Ajukan Ulang</button>
-                    <a href="{{ route('orders.index') }}" class="btn btn-light">Batal</a>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
+    </form>
+</div>
 
-    {{-- SCRIPT DUPLIKASI BARIS PRODUK (Sama seperti di Create) --}}
-    {{-- JAVASCRIPT --}}
-    <script>
-        // 1. LOGIKA PELANGGAN & TOP
-        document.getElementById('customerSelect').addEventListener('change', function() {
-            let option = this.options[this.selectedIndex];
-            let top = option.getAttribute('data-top');
+{{-- SCRIPT DYNAMIC FORM --}}
+@push('scripts')
+<script>
+    $(document).ready(function() {
 
-            if (top) {
-                // Hitung Tanggal Jatuh Tempo
-                let today = new Date();
-                today.setDate(today.getDate() + parseInt(top));
-                let dateString = today.toISOString().split('T')[0];
+        // 1. Fungsi Tambah Baris
+        $('#add-product-btn').click(function() {
+            let row = `
+                <div class="row g-2 mb-2 product-row align-items-end">
+                    <div class="col-md-7">
+                        <select name="product_id[]" class="form-select" required>
+                            <option value="" selected disabled>-- Pilih Produk --</option>
+                            @foreach($products as $product)
+                                <option value="{{ $product->id }}">
+                                    {{ $product->name }} (Stok: {{ $product->stock }})
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" name="quantity[]" class="form-control" min="1" value="1" required placeholder="Jml">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="button" class="btn btn-danger w-100 btn-remove-row">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+            $('#product-list').append(row);
+        });
 
-                document.getElementById('dueDateInput').value = dateString;
-
-                // Info TOP
-                let msg = top > 0 ?
-                    `<span class="text-danger fw-bold"><i class="bi bi-clock-history"></i> Kredit (TOP ${top} Hari). Wajib Upload Bukti.</span>` :
-                    `<span class="text-success fw-bold"><i class="bi bi-cash-coin"></i> Cash / Tunai.</span>`;
-
-                document.getElementById('topInfo').innerHTML = msg;
-
-                // Warning Bukti Bayar
-                let warning = document.getElementById('proofWarning');
-                if (top > 0) warning.classList.remove('d-none');
-                else warning.classList.add('d-none');
-
+        // 2. Fungsi Hapus Baris
+        $(document).on('click', '.btn-remove-row', function() {
+            // Cek sisa baris, jangan sampai kosong semua
+            if ($('.product-row').length > 1) {
+                $(this).closest('.product-row').remove();
             } else {
-                document.getElementById('topInfo').innerText = "Pilih customer untuk cek TOP.";
+                alert('Minimal harus ada 1 barang!');
             }
         });
 
-        // 2. LOGIKA KERANJANG BELANJA
-        let cartTotal = 0;
-
-        function addToCart() {
-            let productSelect = document.getElementById('productSelect');
-            let qtyInput = document.getElementById('qtyInput');
-
-            let id = productSelect.value;
-            let name = productSelect.options[productSelect.selectedIndex].getAttribute('data-name');
-            let price = parseFloat(productSelect.options[productSelect.selectedIndex].getAttribute('data-price'));
-            let stock = parseInt(productSelect.options[productSelect.selectedIndex].getAttribute('data-stock'));
-            let qty = parseInt(qtyInput.value);
-
-            // Validasi Sederhana
-            if (!id) {
-                alert('Pilih produk dulu bos!');
-                return;
-            }
-            if (qty > stock) {
-                alert('Stok tidak cukup! Sisa cuma: ' + stock);
-                return;
-            }
-
-            // Hapus Baris Kosong
-            let emptyRow = document.getElementById('emptyRow');
-            if (emptyRow) emptyRow.remove();
-
-            // Hitung Subtotal
-            let subtotal = price * qty;
-            cartTotal += subtotal;
-
-            // Tambah Baris ke Tabel
-            let tbody = document.getElementById('cartBody');
-            let row = document.createElement('tr');
-
-            row.innerHTML = `
-            <td>
-                <input type="hidden" name="product_id[]" value="${id}">
-                <span class="fw-bold text-dark">${name}</span>
-            </td>
-            <td class="text-center">
-                <input type="hidden" name="quantity[]" value="${qty}">
-                <span class="badge bg-light text-dark border">${qty}</span>
-            </td>
-            <td class="text-end text-muted small">
-                Rp ${new Intl.NumberFormat('id-ID').format(price)}
-            </td>
-            <td class="text-end fw-bold text-dark">
-                Rp ${new Intl.NumberFormat('id-ID').format(subtotal)}
-            </td>
-            <td class="text-center">
-                <button type="button" class="btn btn-sm btn-outline-danger border-0" onclick="removeRow(this, ${subtotal})">
-                    <i class="bi bi-trash-fill"></i>
-                </button>
-            </td>
-        `;
-
-            tbody.appendChild(row);
-
-            // Update Total
-            updateGrandTotal();
-
-            // Reset Input
-            productSelect.value = "";
-            qtyInput.value = 1;
-        }
-
-        function removeRow(btn, subtotal) {
-            let row = btn.closest('tr');
-            row.remove();
-            cartTotal -= subtotal;
-            updateGrandTotal();
-
-            // Cek kalau kosong, balikin baris kosong
-            let tbody = document.getElementById('cartBody');
-            if (tbody.children.length === 0) {
-                tbody.innerHTML =
-                    `<tr id="emptyRow"><td colspan="5" class="text-center py-5 text-muted"><i class="bi bi-basket fs-1 d-block mb-2 opacity-25"></i>Keranjang Kosong</td></tr>`;
-            }
-        }
-
-        function updateGrandTotal() {
-            document.getElementById('grandTotalDisplay').innerText = 'Rp ' + new Intl.NumberFormat('id-ID').format(
-                cartTotal);
-        }
-    </script>
+    });
+</script>
+@endpush
 @endsection
