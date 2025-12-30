@@ -24,7 +24,7 @@
             justify-content: center;
 
             /* BACKGROUND GAMBAR INTERIOR (Ganti URL ini dengan foto toko Anda jika mau) */
-            background: url('images/Logo.jpg') no-repeat center center;
+            background: url('images/logo.jpeg') no-repeat center center;
 
             /* Overlay Hitam Transparan (Biar tulisan terbaca) */
             position: relative;
@@ -114,7 +114,7 @@
         {{-- Logo Perusahaan --}}
         <div class="mb-4">
             {{-- GANTI ICON DENGAN GAMBAR --}}
-            <img src="{{ asset('images/Logo.png') }}" alt="Logo Bintang Interior" class="img-fluid drop-shadow"
+            <img src="{{ asset('images/logo.png') }}" alt="Logo Bintang Interior" class="img-fluid drop-shadow"
                 style="max-height: 80px; width: auto;">
             {{-- Atur max-height sesuai bentuk logo Anda --}}
         </div>
@@ -122,8 +122,7 @@
         {{-- Judul Aplikasi --}}
 
         <div class="sidebar-brand-text ms-2 text-start d-flex flex-column justify-content-center">
-            <div class="fw-bold text-white text-uppercase"
-                style="font-size: 2rem; letter-spacing: 1px;">
+            <div class="fw-bold text-white text-uppercase" style="font-size: 2rem; letter-spacing: 1px;">
                 {{ \App\Models\Setting::where('key', 'app_name')->value('value') ?? 'SFA BINTANG' }}
             </div>
             <div class="text-white-50 fst-italic mt-1" style="font-size: 0.65rem; font-weight: 300;">

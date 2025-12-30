@@ -531,12 +531,16 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-4 mb-4">
                             <div class="card shadow-sm border-0 h-100">
-                                <div class="card-.blade.php                                    <h6 class="text-muted small
-                                    fw-bold text-uppercase">Sisa Piutang</h6>
-                                    <h3 class="fw-bold text-danger">Rp
-                                        {{ number_format($totalReceivable ?? 0, 0, ',', '.') }}</h3>
+                                <div class="card-body">
+                                    {{-- Ubah label jadi text-uppercase text-secondary small agar sama dengan sebelahnya --}}
+                                    <h6 class="text-uppercase text-secondary fw-bold small mb-2">Sisa Piutang</h6>
+
+                                    {{-- Angka tetap merah (text-danger) untuk highlight hutang, tapi font dipertebal --}}
+                                    <h3 class="fw-bold text-danger mb-0">
+                                        Rp {{ number_format($totalPiutang ?? 0, 0, ',', '.') }}
+                                    </h3>
                                 </div>
                             </div>
                         </div>
@@ -635,7 +639,7 @@
                             </form>
                         </div>
                     </div>
-                    
+
                     {{-- SCRIPT CHART UNTUK ADMIN/MANAGER --}}
                     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 

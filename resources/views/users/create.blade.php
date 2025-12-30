@@ -31,12 +31,16 @@
                         </div>
 
                         <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">Role / Jabatan</label>
-                                <select name="role" class="form-select" required id="roleSelect">
-                                    <option value="sales">Sales Lapangan</option>
-                                    <option value="manager">Manager</option>
-                                    <option value="admin">Admin</option>
+                            <div class="mb-3">
+                                <label for="role" class="form-label">Role / Jabatan</label>
+                                <select name="role" id="role" class="form-select" required>
+                                    <option value="" disabled selected>-- Pilih Jabatan --</option>
+
+                                    {{-- Looping Role dari Controller --}}
+                                    @foreach ($roles as $key => $label)
+                                        <option value="{{ $key }}">{{ $label }}</option>
+                                    @endforeach
+
                                 </select>
                             </div>
 

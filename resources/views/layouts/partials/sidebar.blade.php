@@ -27,13 +27,13 @@
     $canViewApprovals = $isApprover || $isManagerOperasional;
 
     // --- 2. HITUNG VISIBILITAS MENU UTAMA (PARENT) ---
-    // Menu Keuangan hanya muncul jika user boleh lihat Piutang ATAU boleh Request TOP
+    // Menu Keuangan
     $showFinanceMenu = $canViewReceivables || $canRequestTop;
 
-    // Menu Pesanan hanya muncul jika boleh buat order ATAU lihat history (biasanya true untuk semua auth)
+    // Menu Pesanan
     $showOrderMenu = $canCreateOrder || $canViewOrderHistory;
 
-    // Menu Approval (sudah dicover $canViewApprovals, tapi pastikan logicnya benar)
+    // Menu Approval
     $showApprovalMenu = $canViewApprovals;
 
     // Menu Visit
@@ -45,9 +45,9 @@
     // Menu User (Hanya Manager Ops)
     $showUserMenu = $canManageUsers;
 
-    // Menu Quota / Plafon (Manager Ops DAN Manager Bisnis)
-    // Karena Manager Bisnis perlu approve limit sales
-    $showQuotaMenu = $isManagerOperasional || $isManagerBisnis;
+    // Menu Quota / Plafon (Manager Ops, Manager Bisnis, DAN SEMUA SALES)
+    // PERBAIKAN DISINI: Menambahkan role sales agar menu muncul
+    $showQuotaMenu = in_array($userRole, ['manager_operasional', 'manager_bisnis', 'sales', 'sales_store', 'sales_field']);
 
     // Menu Settings
     $showSettingsMenu = $isManagerOperasional;
@@ -58,7 +58,7 @@
     <a class="sidebar-brand d-flex align-items-center justify-content-start text-decoration-none" href="{{ route('dashboard') }}">
         <div class="sidebar-brand-icon">
             <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center p-1" style="width: 42px; height: 42px;">
-                <img src="{{ asset('images/logo.png') }}" alt="Logo" class="img-fluid" style="max-height: 28px; width: auto;"
+                <img src="{{ asset('images/Logo.png') }}" alt="Logo" class="img-fluid" style="max-height: 28px; width: auto;"
                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <i class="bi bi-building-fill text-primary fs-5" style="display: none;"></i>
             </div>
@@ -139,7 +139,7 @@
         </li>
         @endif
 
-        {{-- MENU KEUANGAN (FIXED: Sekarang dibungkus If) --}}
+        {{-- MENU KEUANGAN --}}
         @if ($showFinanceMenu)
         <li>
             <a href="#financeSubmenu" data-bs-toggle="collapse" class="dropdown-toggle"
@@ -175,7 +175,12 @@
             <li>
                 <a href="#userSubmenu" data-bs-toggle="collapse" class="dropdown-toggle"
                     aria-expanded="{{ request()->is('users*', 'quotas*') ? 'true' : 'false' }}">
-                    <span><i class="bi bi-person-gear me-2"></i> Manajemen Tim</span>
+                    {{-- Ubah Label Parent agar masuk akal buat Sales --}}
+                    @if($showUserMenu)
+                        <span><i class="bi bi-person-gear me-2"></i> Manajemen Tim</span>
+                    @else
+                        <span><i class="bi bi-person-badge me-2"></i> Profil & Limit</span>
+                    @endif
                     <i class="bi bi-chevron-down small"></i>
                 </a>
                 <ul class="collapse list-unstyled {{ request()->is('users*', 'quotas*') ? 'show' : '' }}" id="userSubmenu">
@@ -185,9 +190,14 @@
                         <li><a href="{{ route('users.index') }}" class="{{ request()->is('users*') ? 'active' : '' }}">Kelola User</a></li>
                     @endif
 
-                    {{-- Kelola Plafon: Manager Ops & Manager Bisnis --}}
+                    {{-- Kelola Plafon: Manager Ops, Bisnis & Sales --}}
                     @if ($showQuotaMenu)
-                        <li><a href="{{ route('quotas.index') }}" class="{{ request()->is('quotas*') ? 'active' : '' }}">Kelola Plafon Kredit</a></li>
+                        <li>
+                            <a href="{{ route('quotas.index') }}" class="{{ request()->is('quotas*') ? 'active' : '' }}">
+                                {{-- Label Dinamis: Manager = Kelola, Sales = Saya --}}
+                                {{ ($isManagerOperasional || $isManagerBisnis) ? 'Kelola Plafon Kredit' : 'Plafon Kredit Saya' }}
+                            </a>
+                        </li>
                     @endif
 
                 </ul>

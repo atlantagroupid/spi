@@ -11,11 +11,14 @@ return new class extends Migration
      */
     public function up()
     {
-        Schema::create('customer_categories', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique(); // Contoh: 'Toko', 'Kontraktor'
-            $table->timestamps();
-        });
+        // Cek dulu: Jika tabel 'customer_categories' BELUM ada, baru buat.
+        if (!Schema::hasTable('customer_categories')) {
+            Schema::create('customer_categories', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->unique();
+                $table->timestamps();
+            });
+        }
     }
 
     /**

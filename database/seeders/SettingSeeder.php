@@ -74,7 +74,6 @@ class SettingSeeder extends Seeder
         // A. Buat Gudang Pusat
         $gudangPusat = Gudang::firstOrCreate(
             ['name' => 'Gudang Pusat (Lambaro)'],
-            ['address' => 'Jl. Soekarno Hatta No. 12, Lambaro, Aceh Besar']
         );
 
         // B. Buat Gate (Pintu/Area) di Gudang Pusat

@@ -8,7 +8,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     {{-- Favicon & Manifest --}}
-    <link rel="icon" type="image/png" href="{{ asset('logo-512.png') }}">
+    <link rel="icon" type="image/png" href="{{ asset('Logo.png') }}">
     <link rel="manifest" href="{{ asset('manifest.json') }}">
     <meta name="theme-color" content="#0d6efd">
     <link rel="apple-touch-icon" href="{{ asset('logo-192.png') }}">

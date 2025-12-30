@@ -21,7 +21,23 @@ class UserController extends Controller
     // 2. Form Tambah User Baru
     public function create()
     {
-        return view('users.create');
+        // 1. Daftar Lengkap Semua Role di Sistem Anda
+        $roles = [
+            'manager_bisnis'      => 'Manager Bisnis',
+            'manager_operasional' => 'Manager Operasional',
+            'kepala_gudang'       => 'Kepala Gudang',
+            'admin_gudang'        => 'Admin Gudang',
+            'purchase'            => 'Purchase (Pembelian)',
+            'finance'             => 'Finance (Keuangan)',
+            'sales_store'         => 'Sales Toko',
+            'sales_field'         => 'Sales Lapangan',
+        ];
+
+        // 2. Filter: Hapus 'manager_operasional' dari daftar
+        unset($roles['manager_operasional']);
+
+        // 3. Kirim ke View
+        return view('users.create', compact('roles'));
     }
 
     // 3. Simpan User Baru
@@ -55,38 +71,38 @@ class UserController extends Controller
     }
 
     public function update(Request $request, User $user)
-{
-    // 1. Validasi Input
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => ['required', 'email', \Illuminate\Validation\Rule::unique('users')->ignore($user->id)],
-        'role' => 'required|string', // Kita izinkan string agar fleksibel dengan role baru
-        'sales_target' => 'nullable|numeric|min:0',      // Validasi Target Omset
-        'daily_visit_target' => 'nullable|integer|min:0', // Validasi Target Visit
-    ]);
+    {
+        // 1. Validasi Input
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => ['required', 'email', \Illuminate\Validation\Rule::unique('users')->ignore($user->id)],
+            'role' => 'required|string', // Kita izinkan string agar fleksibel dengan role baru
+            'sales_target' => 'nullable|numeric|min:0',      // Validasi Target Omset
+            'daily_visit_target' => 'nullable|integer|min:0', // Validasi Target Visit
+        ]);
 
-    // 2. Siapkan Data
-    $data = [
-        'name' => $request->name,
-        'email' => $request->email,
-        'phone' => $request->phone, // Pastikan kolom 'phone' ada di $fillable User model
-        'role' => $request->role,
+        // 2. Siapkan Data
+        $data = [
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone, // Pastikan kolom 'phone' ada di $fillable User model
+            'role' => $request->role,
 
-        // Simpan Target KPI (Pakai operator ?? 0 untuk default)
-        'sales_target' => $request->sales_target ?? 0,
-        'daily_visit_target' => $request->daily_visit_target ?? 5,
-    ];
+            // Simpan Target KPI (Pakai operator ?? 0 untuk default)
+            'sales_target' => $request->sales_target ?? 0,
+            'daily_visit_target' => $request->daily_visit_target ?? 5,
+        ];
 
-    // 3. Cek Password (Hanya update jika diisi)
-    if ($request->filled('password')) {
-        $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        // 3. Cek Password (Hanya update jika diisi)
+        if ($request->filled('password')) {
+            $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+        }
+
+        // 4. Eksekusi Update
+        $user->update($data);
+
+        return redirect()->route('users.index')->with('success', 'Data user & Target KPI berhasil diperbarui!');
     }
-
-    // 4. Eksekusi Update
-    $user->update($data);
-
-    return redirect()->route('users.index')->with('success', 'Data user & Target KPI berhasil diperbarui!');
-}
 
     // 6. Hapus User
     public function destroy(User $user)
