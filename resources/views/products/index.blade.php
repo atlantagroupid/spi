@@ -89,6 +89,15 @@
                             </table>
                         </div>
                     </div>
+                    {{-- FOOTER PAGINATION --}}
+                    @if ($lowStockProducts->hasPages())
+                        <div class="card-footer bg-white py-2">
+                            <div class="d-flex justify-content-center">
+                                {{-- Gunakan pagination simple Bootstrap --}}
+                                {{ $lowStockProducts->appends(request()->query())->links('pagination::bootstrap-4') }}
+                            </div>
+                        </div>
+                    @endif
                 </div>
             </div>
         @endif
@@ -169,120 +178,137 @@
                     </thead>
                     <tbody>
                         @forelse($products as $product)
-                            <tr>
-                                {{-- GAMBAR --}}
-                                <td class="text-center" style="width: 80px;">
-                                    @if ($product->image)
-                                        <a href="#" data-bs-toggle="modal"
-                                            data-bs-target="#imgModal{{ $product->id }}">
-                                            <img src="{{ asset('storage/products/' . $product->image) }}"
-                                                class="rounded border shadow-sm" width="50" height="50"
-                                                style="object-fit: cover; cursor: pointer;" alt="Img">
-                                        </a>
-                                        {{-- MODAL GAMBAR DI DALAM LOOP (Unik per ID) --}}
-                                        <div class="modal fade" id="imgModal{{ $product->id }}" tabindex="-1">
-                                            <div class="modal-dialog modal-dialog-centered">
-                                                <div class="modal-content">
-                                                    <div class="modal-header">
-                                                        <h6 class="modal-title fw-bold">{{ $product->name }}</h6>
-                                                        <button type="button" class="btn-close"
-                                                            data-bs-dismiss="modal"></button>
-                                                    </div>
-                                                    <div class="modal-body text-center p-0 bg-light">
-                                                        <img src="{{ asset('storage/products/' . $product->image) }}"
-                                                            class="img-fluid" style="max-height: 500px;">
-                                                    </div>
+                            {{-- KOLOM GAMBAR (OPTIMIZED) --}}
+                            <td class="text-center" style="width: 80px;">
+                                @if ($product->image)
+                                    {{-- JIKA ADA GAMBAR --}}
+                                    <a href="#" data-bs-toggle="modal" data-bs-target="#imgModal{{ $product->id }}">
+                                        <img src="{{ asset('storage/products/' . $product->image) }}"
+                                            alt="{{ $product->name }}" class="rounded border shadow-sm" width="50"
+                                            height="50" loading="lazy" {{-- FITUR LAZY LOAD --}}
+                                            style="object-fit: cover; cursor: pointer;">
+                                    </a>
+
+                                    {{-- MODAL PREVIEW --}}
+                                    <div class="modal fade" id="imgModal{{ $product->id }}" tabindex="-1">
+                                        <div class="modal-dialog modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h6 class="modal-title fw-bold text-truncate" style="max-width: 90%;">
+                                                        {{ $product->name }}
+                                                    </h6>
+                                                    <button type="button" class="btn-close"
+                                                        data-bs-dismiss="modal"></button>
+                                                </div>
+                                                <div class="modal-body text-center p-0 bg-light">
+                                                    <img src="{{ asset('storage/products/' . $product->image) }}"
+                                                        class="img-fluid" loading="lazy" {{-- LAZY JUGA DI MODAL --}}
+                                                        style="max-height: 500px;">
                                                 </div>
                                             </div>
                                         </div>
+                                    </div>
+                                @else
+                                    {{-- JIKA TIDAK ADA GAMBAR (FALLBACK ICON) --}}
+                                    <div class="d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 rounded border"
+                                        style="width: 50px; height: 50px; margin: 0 auto;" title="Tidak ada gambar">
+                                        <i class="bi bi-card-image text-secondary fs-5"></i>
+                                    </div>
+                                @endif
+                            </td>
+
+                            {{-- NAMA --}}
+                            <td>
+                                <div class="fw-bold text-dark">{{ $product->name }}</div>
+                            </td>
+
+                            {{-- KATEGORI --}}
+                            <td><span class="badge bg-light text-dark border">{{ $product->category }}</span></td>
+
+                            {{-- LOKASI --}}
+                            <td>
+                                <div class="small lh-sm">
+                                    <div class="fw-bold">{{ $product->lokasi_gudang ?? 'N/A' }}</div>
+                                    <div class="text-muted">
+                                        @if ($product->gate)
+                                            Gate: {{ $product->gate }}
+                                        @endif
+                                        @if ($product->gate && $product->block)
+                                            |
+                                        @endif
+                                        @if ($product->block)
+                                            Block: {{ $product->block }}
+                                        @endif
+                                    </div>
+                                </div>
+                            </td>
+
+                            {{-- HARGA (LOGIKA ROLE) --}}
+                            @if (Auth::user()->role === 'purchase')
+                                <td>Rp {{ number_format($product->price, 0, ',', '.') }}</td>
+                                <td class="bg-danger bg-opacity-10">
+                                    <form action="{{ route('products.updateDiscount', $product->id) }}" method="POST"
+                                        class="d-flex gap-1">
+                                        @csrf
+                                        <input type="number" name="discount_price"
+                                            class="form-control form-control-sm border-danger text-danger fw-bold"
+                                            value="{{ $product->discount_price == 0 ? '' : $product->discount_price }}"
+                                            placeholder="No Disc">
+                                        <button type="submit" class="btn btn-sm btn-danger shadow-sm">
+                                            <i class="bi bi-check-lg"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                            @else
+                                <td>
+                                    @if ($product->discount_price && $product->discount_price > 0)
+                                        <div class="text-decoration-line-through text-muted small">
+                                            Rp {{ number_format($product->price, 0, ',', '.') }}
+                                        </div>
+                                        <div class="fw-bold text-danger">
+                                            Rp {{ number_format($product->discount_price, 0, ',', '.') }}
+                                        </div>
                                     @else
-                                        <img src="https://via.placeholder.com/50?text=No+Img"
-                                            class="rounded border opacity-50" width="50" height="50">
+                                        <div class="fw-bold text-primary">
+                                            Rp {{ number_format($product->price, 0, ',', '.') }}
+                                        </div>
                                     @endif
                                 </td>
+                            @endif
 
-                                {{-- NAMA --}}
-                                <td><div class="fw-bold text-dark">{{ $product->name }}</div></td>
+                            {{-- STOK --}}
+                            <td class="text-center">
+                                <span class="badge {{ $product->stock <= 10 ? 'bg-warning text-dark' : 'bg-success' }}">
+                                    {{ $product->stock }}
+                                </span>
+                            </td>
 
-                                {{-- KATEGORI --}}
-                                <td><span class="badge bg-light text-dark border">{{ $product->category }}</span></td>
-
-                                {{-- LOKASI --}}
-                                <td>
-                                    <div class="small lh-sm">
-                                        <div class="fw-bold">{{ $product->lokasi_gudang ?? 'N/A' }}</div>
-                                        <div class="text-muted">
-                                            @if($product->gate) Gate: {{ $product->gate }} @endif
-                                            @if($product->gate && $product->block) | @endif
-                                            @if($product->block) Block: {{ $product->block }} @endif
-                                        </div>
-                                    </div>
-                                </td>
-
-                                {{-- HARGA (LOGIKA ROLE) --}}
-                                @if (Auth::user()->role === 'purchase')
-                                    <td>Rp {{ number_format($product->price, 0, ',', '.') }}</td>
-                                    <td class="bg-danger bg-opacity-10">
-                                        <form action="{{ route('products.updateDiscount', $product->id) }}" method="POST"
-                                            class="d-flex gap-1">
+                            {{-- AKSI (EDIT/DELETE) --}}
+                            @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                                <td class="text-center">
+                                    <div class="d-flex justify-content-center gap-1">
+                                        <a href="{{ route('products.edit', $product->id) }}"
+                                            class="btn btn-sm btn-outline-primary" title="Edit">
+                                            <i class="bi bi-pencil-square"></i>
+                                        </a>
+                                        <form action="{{ route('products.destroy', $product->id) }}" method="POST"
+                                            class="d-inline"
+                                            onsubmit="return confirm('Hapus data produk ini? Data tidak bisa dikembalikan.');">
                                             @csrf
-                                            <input type="number" name="discount_price"
-                                                class="form-control form-control-sm border-danger text-danger fw-bold"
-                                                value="{{ $product->discount_price == 0 ? '' : $product->discount_price }}"
-                                                placeholder="No Disc">
-                                            <button type="submit" class="btn btn-sm btn-danger shadow-sm">
-                                                <i class="bi bi-check-lg"></i>
+                                            @method('DELETE')
+                                            <button type="submit" class="btn btn-sm btn-danger shadow-sm"
+                                                title="Hapus">
+                                                <i class="bi bi-trash"></i>
                                             </button>
                                         </form>
-                                    </td>
-                                @else
-                                    <td>
-                                        @if ($product->discount_price && $product->discount_price > 0)
-                                            <div class="text-decoration-line-through text-muted small">
-                                                Rp {{ number_format($product->price, 0, ',', '.') }}
-                                            </div>
-                                            <div class="fw-bold text-danger">
-                                                Rp {{ number_format($product->discount_price, 0, ',', '.') }}
-                                            </div>
-                                        @else
-                                            <div class="fw-bold text-primary">
-                                                Rp {{ number_format($product->price, 0, ',', '.') }}
-                                            </div>
-                                        @endif
-                                    </td>
-                                @endif
-
-                                {{-- STOK --}}
-                                <td class="text-center">
-                                    <span class="badge {{ $product->stock <= 10 ? 'bg-warning text-dark' : 'bg-success' }}">
-                                        {{ $product->stock }}
-                                    </span>
+                                    </div>
                                 </td>
-
-                                {{-- AKSI (EDIT/DELETE) --}}
-                                @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
-                                    <td class="text-center">
-                                        <div class="d-flex justify-content-center gap-1">
-                                            <a href="{{ route('products.edit', $product->id) }}"
-                                                class="btn btn-sm btn-outline-primary" title="Edit">
-                                                <i class="bi bi-pencil-square"></i>
-                                            </a>
-                                            <form action="{{ route('products.destroy', $product->id) }}" method="POST"
-                                                class="d-inline" onsubmit="return confirm('Hapus data produk ini? Data tidak bisa dikembalikan.');">
-                                                @csrf
-                                                @method('DELETE')
-                                                <button type="submit" class="btn btn-sm btn-danger shadow-sm"
-                                                    title="Hapus">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                @endif
+                            @endif
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">Tidak ada data produk ditemukan.</td>
+                                <td colspan="7" class="text-center py-4 text-muted">Tidak ada data produk ditemukan.
+                                </td>
                             </tr>
                         @endforelse
                     </tbody>
@@ -294,44 +320,73 @@
         </div>
     </div>
 
-    {{-- 4. MODAL RESTOCK (GLOBAL) --}}
-    <div class="modal fade" id="restockModal" tabindex="-1">
+    {{-- MODAL UPDATE RESTOCK (FIXED METHOD) --}}
+    <div class="modal fade" id="restockModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-warning bg-opacity-25">
-                    <h5 class="modal-title fw-bold">Update Info Restock</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form id="restockForm" action="" method="POST">
+                <form id="restockForm" method="POST">
                     @csrf
+                    {{-- PERBAIKAN: Tambahkan @method('PATCH') karena Route::patch --}}
+                    @method('PATCH')
+
+                    <div class="modal-header bg-light">
+                        <h5 class="modal-title">
+                            <i class="bi bi-box-seam me-2"></i>Update Restock
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+
                     <div class="modal-body">
-                        <p>Barang: <strong id="modalProductName"></strong></p>
+                        <div class="mb-3 text-center">
+                            <h6 class="text-muted small uppercase">Nama Produk</h6>
+                            <h4 class="fw-bold text-primary" id="modalProductName">...</h4>
+                        </div>
+
                         <div class="mb-3">
-                            <label class="form-label">Tanggal Pemesanan (PO)</label>
-                            <input type="date" name="restock_date" id="modalRestockDate" class="form-control" required>
+                            <label class="form-label fw-bold small">Tanggal Estimasi Barang Masuk</label>
+                            <input type="date" name="restock_date" id="modalRestockDate" class="form-control"
+                                required>
+                            <div class="form-text text-muted small">
+                                Pilih tanggal kapan stok baru diperkirakan tiba di gudang.
+                            </div>
                         </div>
                     </div>
+
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-primary">Simpan</button>
+                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary btn-sm fw-bold">
+                            <i class="bi bi-save me-1"></i> Simpan Jadwal
+                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    {{-- 5. SCRIPT PENDUKUNG --}}
-    <script>
-        // Script untuk membuka Modal Restock & mengisi data dinamis
-        function openRestockModal(id, name, date) {
-            document.getElementById('modalProductName').innerText = name;
-            document.getElementById('modalRestockDate').value = date;
+    {{-- 5. SCRIPT PENDUKUNG & MODAL --}}
+    @push('scripts')
+        <script>
+            function openRestockModal(id, name, date) {
+                // 1. Isi Nama Produk di Header Modal
+                document.getElementById('modalProductName').innerText = name;
 
-            let url = "{{ route('products.updateRestock', ':id') }}";
-            url = url.replace(':id', id);
-            document.getElementById('restockForm').action = url;
+                // 2. Isi Tanggal
+                let dateInput = document.getElementById('modalRestockDate');
+                if (date) {
+                    dateInput.value = date.split(' ')[0];
+                } else {
+                    dateInput.value = '';
+                }
 
-            new bootstrap.Modal(document.getElementById('restockModal')).show();
-        }
-    </script>
+                // 3. Update Action URL pada Form
+                let url = "{{ route('products.updateRestock', ':id') }}";
+                url = url.replace(':id', id);
+                document.getElementById('restockForm').action = url;
+
+                // 4. Tampilkan Modal
+                let myModal = new bootstrap.Modal(document.getElementById('restockModal'));
+                myModal.show();
+            }
+        </script>
+    @endpush
 @endsection

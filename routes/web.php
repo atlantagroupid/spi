@@ -93,7 +93,7 @@ Route::middleware('auth')->group(function () {
     Route::middleware(['role:manager_operasional,kepala_gudang,admin_gudang,purchase'])->group(function () {
         Route::resource('products', ProductController::class);
         Route::controller(ProductController::class)->prefix('products')->name('products.')->group(function () {
-            Route::post('/{id}/update-restock', 'updateRestock')->name('updateRestock');
+            Route::patch('/{id}/update-restock', 'updateRestock')->name('updateRestock');
             Route::post('/{id}/update-discount', 'updateDiscount')->name('updateDiscount');
         });
     });
@@ -113,11 +113,11 @@ Route::middleware('auth')->group(function () {
 
     // --- E. TRANSAKSI (ORDERS) ---
     // PENTING: Custom route ditaruh SEBELUM Resource
-    Route::put('/orders/{order}/reject', [OrderController::class, 'reject'])->name('orders.reject');
     Route::controller(OrderController::class)->prefix('orders')->name('orders.')->group(function () {
         Route::get('/print-pdf', 'printPdf')->name('printPdf');
         Route::get('/export', 'export')->name('export');
         Route::get('/export-list-pdf', 'exportListPdf')->name('exportListPdf');
+        Route::put('/orders/{order}/reject', [OrderController::class, 'reject'])->name('orders.reject');
         Route::get('/{id}/export-pdf', 'exportPdf')->name('exportPdf');
         Route::post('/{order}/process', 'processOrder')->name('process');
         Route::post('/{id}/confirm-arrival', 'confirmArrival')->name('confirmArrival');

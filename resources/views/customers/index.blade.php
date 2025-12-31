@@ -5,7 +5,7 @@
 @section('content')
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1 class="h3 fw-bold text-gray-800">Data Toko / Pelanggan</h1>
-        @if (in_array(Auth::user()->role, ['sales', 'manager_operasional']))
+        @if (in_array(Auth::user()->role, ['sales_field', 'sales_store', 'manager_operasional']))
             <a href="{{ route('customers.create') }}" class="btn btn-primary shadow-sm">
                 <i class="bi bi-shop me-1"></i> Tambah Toko Baru
             </a>
