@@ -447,4 +447,40 @@ class OrderController extends Controller
             ]);
         }
     }
+
+    // Method Khusus untuk Select2 AJAX
+    public function searchProducts(Request $request)
+    {
+        $search = $request->search;   // Kata yang diketik sales
+        $category = $request->category; // Filter kategori (opsional)
+
+        $query = \App\Models\Product::query();
+
+        // 1. Filter Berdasarkan Kategori (Jika dipilih)
+        if ($category) {
+            $query->where('category', $category);
+        }
+
+        // 2. Filter Berdasarkan Kata Kunci (Nama Produk)
+        if ($search) {
+            $query->where('name', 'like', "%{$search}%");
+        }
+
+        // 3. Ambil 20 data saja biar ringan
+        $products = $query->limit(20)->get();
+
+        // 4. Format data sesuai standar Select2
+        $response = [];
+        foreach ($products as $product) {
+            $response[] = [
+                'id' => $product->id,
+                'text' => $product->name . " (Stok: $product->stock)", // Teks yang tampil
+                // Data tambahan untuk Javascript (Harga & Stok)
+                'price' => $product->price,
+                'stock' => $product->stock
+            ];
+        }
+
+        return response()->json($response);
+    }
 }

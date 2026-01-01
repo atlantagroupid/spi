@@ -126,6 +126,8 @@ Route::middleware('auth')->group(function () {
         Route::get('/{id}/export-pdf', 'exportPdf')->name('exportPdf');
         Route::post('/{order}/process', 'processOrder')->name('process');
         Route::post('/{id}/confirm-arrival', 'confirmArrival')->name('confirmArrival');
+        // ROUTE KHUSUS PENCARIAN PRODUK (AJAX)
+        Route::get('/ajax/search-products', 'searchProducts')->name('ajax_products');
     });
     // Resource ditaruh di bawah
     Route::resource('orders', OrderController::class);

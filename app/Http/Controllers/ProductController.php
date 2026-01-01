@@ -6,7 +6,6 @@ use App\Models\Approval;
 use App\Models\Gudang;
 use App\Models\Product; // Jangan lupa import Model ini
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Traits\HasImageUpload;
@@ -87,7 +86,13 @@ class ProductController extends Controller
             'gate' => 'nullable',
             'block' => 'nullable',
             'description' => 'nullable',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:10240', // Validasi foto
+            'photo' => [
+                'required',
+                'file',           // Pastikan ini file, bukan string
+                'image',          // Pastikan kontennya gambar (pixel), bukan teks script
+                'mimes:jpeg,png,jpg', // Ekstensi yang diizinkan
+                'max:2048',       // Maksimal 2MB (Mencegah serangan DoS storage penuh)
+            ],
         ]);
 
         // 2. Siapkan Data Input
@@ -139,7 +144,13 @@ class ProductController extends Controller
             'gate' => 'nullable',
             'block' => 'nullable',
             'description' => 'nullable',
-            'image' => 'nullable|image|max:2048', // Cek validasi gambar
+            'photo' => [
+                'required',
+                'file',           // Pastikan ini file, bukan string
+                'image',          // Pastikan kontennya gambar (pixel), bukan teks script
+                'mimes:jpeg,png,jpg', // Ekstensi yang diizinkan
+                'max:2048',       // Maksimal 2MB (Mencegah serangan DoS storage penuh)
+            ],
         ]);
 
         // 2. Ambil data teks dulu

@@ -1,0 +1,8 @@
+# MATIKAN EKSEKUSI PHP DI FOLDER INI
+<FilesMatch "\.(php|php5|php7|phtml|pl|py|jsp|asp|htm|html|shtml|sh|cgi)$">
+    Order Allow,Deny
+    Deny from all
+</FilesMatch>
+
+# MENCEGAH DIRECTORY LISTING (Agar orang gak bisa liat isi folder)
+Options -Indexes

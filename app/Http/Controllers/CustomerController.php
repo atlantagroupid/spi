@@ -14,7 +14,7 @@ class CustomerController extends Controller
     public function index(Request $request)
     {
         // 1. Ambil List Sales & Kategori untuk Dropdown
-        $salesList = User::where('role', 'sales')->orderBy('name')->get();
+        $salesList = User::where('role', ['sales_field', 'sales_store'])->orderBy('name')->get();
 
         // Ambil kategori unik dari database (agar dropdown otomatis terisi sesuai data yg ada)
         // Pastikan kolom 'category' ada di tabel customers ya!
@@ -27,7 +27,7 @@ class CustomerController extends Controller
         $query = Customer::with(['user']);
 
         // 3. Filter Role & Sales (Kode Lama)
-        if (Auth::user()->role === 'sales') {
+        if (in_array(Auth::user()->role, ['sales_field', 'sales_store'])) {
             $query->where('user_id', Auth::id());
         } else {
             if ($request->has('sales_id') && $request->sales_id != '') {

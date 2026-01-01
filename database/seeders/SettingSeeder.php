@@ -17,33 +17,34 @@ class SettingSeeder extends Seeder
         // =========================================================
         // 1. KATEGORI PRODUK
         // =========================================================
-        $cats = [
-            'Wallpaper Dinding',
-            'Vinyl Flooring',
-            'SPC Flooring',
-            'Parket Kayu',
-            'Keramik Lantai',
-            'Keramik Dinding',
-            'Granit Alam',
-            'Carpet Tile',
-            'Lem & Aksesoris',
-            'Wall Panel (WPC)',
-            'Gorden / Blinds',
-        ];
+        // $cats = [
+        //     'Wallpaper Dinding',
+        //     'Vinyl Flooring',
+        //     'SPC Flooring',
+        //     'Parket Kayu',
+        //     'Keramik Lantai',
+        //     'Keramik Dinding',
+        //     'Granit Alam',
+        //     'Carpet Tile',
+        //     'Lem & Aksesoris',
+        //     'Wall Panel (WPC)',
+        //     'Gorden / Blinds',
+        // ];
 
-        foreach ($cats as $c) {
-            Category::firstOrCreate(['name' => $c]);
-        }
+        // foreach ($cats as $c) {
+        //     Category::firstOrCreate(['name' => $c]);
+        // }
 
         // =========================================================
         // 2. KATEGORI PELANGGAN
         // =========================================================
         $customerCats = [
-            'End User / Umum',      // Pembeli perorangan
+            'Customer',      // Pembeli perorangan
             'Kontraktor',           // Pemborong proyek
-            'Workshop / Interior',  // Bengkel interior
+            'Workshop',  // Bengkel interior
             'Studio Design',        // Konsultan/Arsitek
-            'Toko / Reseller',      // Toko bangunan lain
+            'Furniture',
+            'Toko / Reseller', // Toko bangunan lain
         ];
 
         foreach ($customerCats as $cc) {

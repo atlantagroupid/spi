@@ -35,7 +35,13 @@ class ProfileController extends Controller
             'name'  => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'phone' => ['nullable', 'string', 'max:20'],
-            'photo' => ['nullable', 'image', 'max:2048'], // Max 2MB
+            'photo' => [
+                'nullable',
+                'file',           // Pastikan ini file, bukan string
+                'image',          // Pastikan kontennya gambar (pixel), bukan teks script
+                'mimes:jpeg,png,jpg', // Ekstensi yang diizinkan
+                'max:2028',       // Maksimal 2MB (Mencegah serangan DoS storage penuh)
+            ],
         ]);
 
         // 2. Update Data Dasar

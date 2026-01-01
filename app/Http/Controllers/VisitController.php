@@ -43,7 +43,13 @@ class VisitController extends Controller
 
         // --- A. VALIDASI ---
         $rules = [
-            'photo' => 'required|image|max:5120',
+            'photo' => [
+                'required',
+                'file',           // Pastikan ini file, bukan string
+                'image',          // Pastikan kontennya gambar (pixel), bukan teks script
+                'mimes:jpeg,png,jpg', // Ekstensi yang diizinkan
+                'max:5120',       // Maksimal 5MB (Mencegah serangan DoS storage penuh)
+            ],
             'type'  => 'required|in:existing,new',
             'notes' => 'required|string', // Catatan wajib
         ];
@@ -93,7 +99,7 @@ class VisitController extends Controller
 
         // Validasi Durasi
         if ($isStoreSales && $duration < 20) {
-             return back()
+            return back()
                 ->withInput()
                 ->withErrors(['check_out_time' => 'Durasi pelayanan minimal 20 menit. Data Anda: ' . $duration . ' menit.']);
         }
