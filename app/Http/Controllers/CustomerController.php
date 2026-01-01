@@ -213,4 +213,21 @@ class CustomerController extends Controller
 
         return view('customers.top_list', compact('customers'));
     }
+    // APPROVE CUSTOMER
+    public function approve($id)
+    {
+        $customer = Customer::findOrFail($id);
+        $customer->update(['status' => 'active']);
+
+        return back()->with('success', 'Customer ' . $customer->name . ' telah disetujui (Aktif).');
+    }
+
+    // REJECT CUSTOMER
+    public function reject($id)
+    {
+        $customer = Customer::findOrFail($id);
+        $customer->update(['status' => 'rejected']);
+
+        return back()->with('error', 'Customer ' . $customer->name . ' telah ditolak.');
+    }
 }

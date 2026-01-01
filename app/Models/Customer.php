@@ -23,6 +23,7 @@ class Customer extends Model
         'longitude',
         'top_days',
         'credit_limit',
+        'status',
     ];
     protected $casts = [
         'top_days' => 'integer',

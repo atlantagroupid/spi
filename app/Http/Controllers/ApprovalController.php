@@ -93,7 +93,13 @@ class ApprovalController extends Controller
             elseif ($action == 'create' && $approval->model_type == \App\Models\Product::class) {
                 \App\Models\Product::create($approval->new_data);
             }
-
+            // [TAMBAHAN BARU] 2.1. APPROVE CUSTOMER BARU
+            // Karena data customer sudah ada (status: pending), kita tinggal ubah jadi active
+            elseif ($action == 'create' && $approval->model_type == \App\Models\Customer::class) {
+                if ($realData) {
+                    $realData->update(['status' => 'active']);
+                }
+            }
             // ======================================================
             // 3. DELETE DATA
             // ======================================================
@@ -221,6 +227,11 @@ class ApprovalController extends Controller
                 }
             } elseif ($approval->action === 'approve_payment') {
                 PaymentLog::where('id', $approval->model_id)->update(['status' => 'rejected']);
+            // [TAMBAHAN BARU] Reject Customer Baru
+            } elseif ($approval->model_type == \App\Models\Customer::class && $approval->action == 'create') {
+                if ($approval->approveable) {
+                    $approval->approveable->update(['status' => 'rejected']);
+                }
             }
         });
 

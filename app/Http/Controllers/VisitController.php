@@ -4,111 +4,154 @@ namespace App\Http\Controllers;
 
 use App\Models\Visit;
 use App\Models\Customer;
-use App\Models\User; // Tambahkan ini agar tidak error di bagian index
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class VisitController extends Controller
 {
-    // ==========================================================
-    // 1. FITUR INPUT MANUAL / CHECK-IN LANGSUNG
-    // ==========================================================
-
+    /**
+     * Menampilkan Form Input Visit Manual (Tanpa Rencana)
+     * Cocok untuk Sales Store atau Visit Dadakan.
+     */
     public function create()
     {
-        $query = Customer::query();
+        $user = Auth::user();
 
-        // JIKA SALES: Filter hanya toko miliknya
-        if (Auth::user()->role === 'sales') {
-            $query->where('user_id', Auth::id());
+        // FILTER CUSTOMER:
+        // 1. Jika Sales Store/Field: Hanya tampilkan customer yang di-handle user ini (user_id)
+        // 2. Jika Manager/Admin: Tampilkan semua
+
+        if (in_array($user->role, ['sales_store', 'sales_field'])) {
+            $customers = \App\Models\Customer::where('user_id', $user->id)
+                ->orderBy('name', 'asc')
+                ->get();
+        } else {
+            $customers = \App\Models\Customer::orderBy('name', 'asc')->get();
         }
 
-        $customers = $query->orderBy('name')->get();
-
-        return view('visits.create', compact('customers'));
+        // 2. AMBIL DATA KATEGORI (TAMBAHAN BARU)
+        // Pastikan nama Model-nya sesuai dengan aplikasi Bapak (misal: Category atau CustomerCategory)
+        $categories = \App\Models\CustomerCategory::all();
+        return view('visits.create', compact('customers', 'categories'));
     }
 
     public function store(Request $request)
     {
         $user = Auth::user();
-
-        // Cek Role: Apakah dia Sales Toko?
-        // (Pastikan kolom 'role' sudah ada di tabel users, atau sesuaikan logikanya)
         $isStoreSales = $user->role === 'sales_store';
 
         // --- A. VALIDASI ---
         $rules = [
             'photo' => 'required|image|max:5120',
             'type'  => 'required|in:existing,new',
+            'notes' => 'required|string', // Catatan wajib
         ];
 
         // 1. Validasi GPS (Hanya Wajib untuk Sales Lapangan)
         if (!$isStoreSales) {
             $rules['latitude']  = 'required';
             $rules['longitude'] = 'required';
+        } else {
+            // 2. Validasi Waktu Manual (KHUSUS Sales Store)
+            // Agar bisa input jam pelayanan yang lalu
+            $rules['check_in_time']  = 'required|date';
+            $rules['check_out_time'] = 'required|date|after:check_in_time';
         }
 
-        // 2. Validasi Tipe Customer (Logic Lama Tetap Jalan)
+        // 3. Validasi Tipe Customer
         if ($request->type == 'new') {
             $rules['new_name']    = 'required|string|max:255';
             $rules['new_phone']   = 'required|string|max:20';
             $rules['new_address'] = 'required|string';
+            $rules['new_category'] = 'required|string';
         } else {
             $rules['customer_id'] = 'required|exists:customers,id';
         }
 
-        // Eksekusi Validasi
-        $request->validate($rules, [
-            'latitude.required'    => 'Lokasi GPS wajib diambil untuk Sales Lapangan!',
-            'customer_id.required' => 'Silakan pilih toko dari daftar.',
-            'new_name.required'    => 'Nama toko baru wajib diisi.',
-        ]);
+        $request->validate($rules);
 
+        // --- B. LOGIKA WAKTU & DURASI ---
+        if ($isStoreSales) {
+            // Jika Store, pakai waktu inputan manual
+            $checkIn  = \Carbon\Carbon::parse($request->check_in_time);
+            $checkOut = \Carbon\Carbon::parse($request->check_out_time);
+        } else {
+            // Jika Lapangan, pakai waktu Real-time (Sekarang)
+            // Asumsi sales lapangan check-in dan check-out saat itu juga (instant visit)
+            // Atau jika Bapak punya fitur Check-in terpisah, logika ini harus beda.
+            // Untuk form ini (Direct Report), kita anggap now()
+            $checkIn  = now()->subMinutes(20); // Default durasi dummy jika instant
+            $checkOut = now();
+        }
 
-        // --- B. LOGIKA PENYIMPANAN ---
+        // Hitung Durasi Real
+        // PERBAIKAN DISINI:
+        // Gunakan $checkIn->diffInMinutes($checkOut) artinya "Jarak dari Masuk ke Keluar"
+        // Tambahkan abs() untuk memaksa angka jadi positif, jaga-jaga jika terbalik.
+        $duration = abs($checkIn->diffInMinutes($checkOut));
 
-        // 1. Tentukan Customer ID (Logic Lama)
+        // Validasi Durasi
+        if ($isStoreSales && $duration < 20) {
+             return back()
+                ->withInput()
+                ->withErrors(['check_out_time' => 'Durasi pelayanan minimal 20 menit. Data Anda: ' . $duration . ' menit.']);
+        }
+
+        // --- C. LOGIKA PENYIMPANAN CUSTOMER ---
         if ($request->type == 'new') {
-            $newCustomer = Customer::create([
+            // 1. Buat Customer (Status Pending)
+            $newCustomer = \App\Models\Customer::create([
                 'user_id'        => $user->id,
                 'name'           => $request->new_name,
                 'phone'          => $request->new_phone,
                 'address'        => $request->new_address,
+                'category'       => $request->new_category,
                 'contact_person' => $request->new_contact ?? null,
-                // Default Customer Baru: Cash Only (Limit 0)
-                'top_days'       => null,
                 'credit_limit'   => 0,
+                'status'         => 'pending_approval',
             ]);
+
+            // 2. [REVISI] Buat Record Approval (Sesuai Kolom Bapak)
+            \App\Models\Approval::create([
+                'requester_id' => $user->id,
+
+                // GANTI INI: Pakai 'model_type' dan 'model_id'
+                'model_type'   => \App\Models\Customer::class,
+                'model_id'     => $newCustomer->id,
+
+                'action'       => 'create', // Atau 'new_customer' biar lebih spesifik
+                'status'       => 'pending',
+                // Pastikan kolom ini ada di DB approval Bapak, kalau tidak ada, hapus baris details ini
+                'details'      => json_encode(['reason' => 'Customer Baru dari Sales Store']),
+            ]);
+
             $customerId = $newCustomer->id;
-            $msg = 'Toko baru didaftarkan & Laporan tersimpan!';
+            $msg = 'Laporan disimpan! Customer baru menunggu persetujuan.';
         } else {
             $customerId = $request->customer_id;
             $msg = 'Laporan kunjungan berhasil disimpan!';
         }
 
-        // 2. Upload Foto
+        // --- D. SIMPAN VISIT ---
         $photoPath = $request->file('photo')->store('visits', 'public');
 
-        // 3. Simpan Visit
-        // Kita kondisikan lat/long dan visit_type berdasarkan role
-        Visit::create([
-            'user_id'        => $user->id,
-            'customer_id'    => $customerId,
-            'visit_date'     => now(),
-            'status'         => 'completed',
-            'completed_at'   => now(),
-            'check_out_time' => now(),
+        \App\Models\Visit::create([
+            'user_id'          => $user->id,
+            'customer_id'      => $customerId,
 
-            // Jika Sales Store: GPS null. Jika Sales Lapangan: Ambil dari request
-            'latitude'       => $isStoreSales ? null : $request->latitude,
-            'longitude'      => $isStoreSales ? null : $request->longitude,
+            // Waktu disesuaikan logika di atas
+            'visit_date'       => $checkIn->format('Y-m-d'),
+            'check_in_at'      => $checkIn,
+            'check_out_at'     => $checkOut, //
+            'duration_minutes' => $duration, // Simpan durasi agar Manager bisa lihat kinerja
 
-            // Penanda Tipe Kunjungan (Penting untuk filter laporan nanti)
-            'visit_type'     => $isStoreSales ? 'store' : 'field',
-
-            'photo_path'     => $photoPath,
-            'notes'          => $request->notes,
+            'status'           => 'completed',
+            'latitude'         => $isStoreSales ? null : $request->latitude,
+            'longitude'        => $isStoreSales ? null : $request->longitude,
+            'visit_type'       => $isStoreSales ? 'store' : 'field',
+            'photo_path'       => $photoPath,
+            'notes'            => $request->notes,
         ]);
 
         return redirect()->route('dashboard')->with('success', $msg);

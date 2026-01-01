@@ -47,15 +47,18 @@ class DashboardController extends Controller
 
     /**
      * -------------------------------------------------------------------------
-     * LOGIC DASHBOARD KHUSUS SALES
+     * LOGIC DASHBOARD KHUSUS SALES (FIELD vs STORE)
      * -------------------------------------------------------------------------
      */
     private function dashboardSales($user)
     {
-        // 1. Target & Omset (Bulanan)
-        $targetOmset = $user->sales_target ?? 0; // Pastikan kolom ini ada di tabel users
+        // CEK TIPE SALES
+        $isSalesStore = ($user->role === 'sales_store');
 
-        $currentOmset = Order::where('user_id', $user->id)
+        // 1. Target & Omset (Bulanan) - BERLAKU UNTUK KEDUANYA
+        $targetOmset = $user->sales_target ?? 0;
+
+        $currentOmset = Order::where('user_id', $user->id) // Filter Punya Sendiri
             ->whereIn('status', ['approved', 'completed', 'shipped'])
             ->whereMonth('created_at', date('m'))
             ->whereYear('created_at', date('Y'))
@@ -63,31 +66,48 @@ class DashboardController extends Controller
 
         $omsetPercentage = ($targetOmset > 0) ? ($currentOmset / $targetOmset) * 100 : 0;
 
-        // 2. Target Visit (Harian)
-        $visitTarget = $user->daily_visit_target ?? 5;
+        // 2. Target Visit & Rencana (HANYA UNTUK SALES FIELD)
+        $visitTarget = 0;
+        $todayVisits = 0;
+        $visitPercentage = 0;
+        $plannedVisits = collect([]); // Collection kosong default
 
-        $todayVisits = Visit::where('user_id', $user->id)
-            ->whereDate('created_at', date('Y-m-d'))
-            ->where('status', 'completed')
-            ->count();
+        if (!$isSalesStore) {
+            // --- LOGIKA SALES FIELD (Lapangan) ---
+            $visitTarget = $user->daily_visit_target ?? 5;
 
-        $visitPercentage = ($visitTarget > 0) ? ($todayVisits / $visitTarget) * 100 : 0;
+            $todayVisits = Visit::where('user_id', $user->id)
+                ->whereDate('created_at', date('Y-m-d'))
+                ->where('status', 'completed')
+                ->count();
 
-        // 3. Rencana Kunjungan Hari Ini
-        $plannedVisits = Visit::with('customer')
-            ->where('user_id', $user->id)
-            ->whereDate('created_at', date('Y-m-d'))
-            ->get();
+            $visitPercentage = ($visitTarget > 0) ? ($todayVisits / $visitTarget) * 100 : 0;
 
-        // 4. Plafon Kredit (Sisa Limit)
+            // Rencana Kunjungan Hari Ini
+            $plannedVisits = Visit::with('customer')
+                ->where('user_id', $user->id)
+                ->whereDate('created_at', date('Y-m-d'))
+                ->get();
+        } else {
+            // --- LOGIKA SALES STORE (Toko) ---
+            // Sales store tidak punya target kunjungan keluar, tapi kita tetap hitung
+            // berapa customer yang mereka layani (Check-in di toko) hari ini sebagai info saja.
+            $todayVisits = Visit::where('user_id', $user->id)
+                ->whereDate('created_at', date('Y-m-d'))
+                ->count();
+
+            // Percentage kita set 100 atau 0 agar tidak error, tapi nanti di view kita hidden widgetnya
+            $visitPercentage = 0;
+        }
+
+        // 3. Plafon Kredit (Sisa Limit) - BERLAKU KEDUANYA
         $limitQuota = $user->credit_limit_quota ?? 0;
         $usedCredit = 0;
         $remaining = 0;
         $isCritical = false;
 
         if ($limitQuota > 0) {
-            // Hitung Order yg pakai limit (TOP/Kredit) dan belum lunas
-            $unpaidOrders = Order::where('user_id', $user->id) // FIX: Pakai user_id bukan id
+            $unpaidOrders = Order::where('user_id', $user->id)
                 ->whereIn('payment_type', ['top', 'kredit'])
                 ->where('payment_status', '!=', 'paid')
                 ->whereNotIn('status', ['cancelled', 'rejected'])
@@ -99,18 +119,16 @@ class DashboardController extends Controller
             }
 
             $remaining = $limitQuota - $usedCredit;
-            // Warning jika sisa kurang dari 20%
             if (($remaining / $limitQuota) * 100 < 20) {
                 $isCritical = true;
             }
         }
 
-        // 5. Grafik Kinerja Pribadi (12 Bulan)
-        $chartData = $this->getMonthlyChartData($user->id); // Panggil Helper Bawah
+        // 4. Grafik Kinerja Pribadi (12 Bulan) - STRICT FILTER USER_ID
+        $chartData = $this->getMonthlyChartData($user->id);
 
-        // LEMPAR KE VIEW KHUSUS SALES
         return view('dashboard.index_sales', compact(
-            'user',
+            'user', 'isSalesStore', // Kirim flag tipe sales ke view
             'targetOmset', 'currentOmset', 'omsetPercentage',
             'visitTarget', 'todayVisits', 'visitPercentage',
             'plannedVisits',
@@ -150,7 +168,7 @@ class DashboardController extends Controller
         $topSales = User::whereIn('role', ['sales_field', 'sales_store'])
             ->withSum(['orders' => function ($q) {
                 $q->whereIn('status', ['approved', 'shipped', 'completed'])
-                  ->whereMonth('created_at', date('m'));
+                    ->whereMonth('created_at', date('m'));
             }], 'total_price')
             ->orderByDesc('orders_sum_total_price')
             ->take(5)
@@ -161,8 +179,11 @@ class DashboardController extends Controller
 
         return view('dashboard.index_manager', compact(
             'user',
-            'totalRevenue', 'cashReceived', 'totalReceivable',
-            'warehouseAsset', 'lowStockCount',
+            'totalRevenue',
+            'cashReceived',
+            'totalReceivable',
+            'warehouseAsset',
+            'lowStockCount',
             'warehouseStats',
             'pendingApprovalCount',
             'topSales',
@@ -205,9 +226,13 @@ class DashboardController extends Controller
 
         return view('dashboard.index_gudang', compact(
             'user',
-            'totalItems', 'lowStockCount',
-            'totalAsset', 'showFinancials', // Kirim flag ini ke view
-            'incomingGoods', 'outgoingGoods', 'pendingApproval'
+            'totalItems',
+            'lowStockCount',
+            'totalAsset',
+            'showFinancials', // Kirim flag ini ke view
+            'incomingGoods',
+            'outgoingGoods',
+            'pendingApproval'
         ));
     }
 
@@ -241,38 +266,42 @@ class DashboardController extends Controller
 
         return view('dashboard.index_finance', compact(
             'user',
-            'cashToday', 'totalReceivable',
-            'pendingPayments', 'pendingLimit',
+            'cashToday',
+            'totalReceivable',
+            'pendingPayments',
+            'pendingLimit',
             'recentTransactions'
         ));
     }
 
     /**
      * -------------------------------------------------------------------------
-     * HELPER: GENERATE CHART DATA
+     * HELPER: GENERATE CHART DATA (OPTIMIZED)
      * -------------------------------------------------------------------------
+     * Ini versi TERBAIK (Single Query).
      */
     private function getMonthlyChartData($userId = null)
     {
+        // 1 Query untuk ambil semua data dalam setahun
         $query = Order::select(
             DB::raw('SUM(total_price) as total'),
             DB::raw('MONTH(created_at) as month')
         )
-        ->whereYear('created_at', date('Y'))
-        ->whereIn('status', ['approved', 'shipped', 'completed'])
-        ->groupBy('month');
+            ->whereYear('created_at', date('Y'))
+            ->whereIn('status', ['approved', 'shipped', 'completed'])
+            ->groupBy('month');
 
-        // Jika ada User ID, filter punya dia saja (untuk Sales Dashboard)
+        // Filter User ID (Penting agar Sales tidak lihat omset global)
         if ($userId) {
             $query->where('user_id', $userId);
         }
 
         $results = $query->pluck('total', 'month')->toArray();
 
-        // Format array [100, 200, 0, ...] untuk 12 bulan
+        // Mapping data agar bulan yang kosong tetap bernilai 0
         $data = [];
         for ($i = 1; $i <= 12; $i++) {
-            $data[] = $results[$i] ?? 0;
+            $data[] = (int) ($results[$i] ?? 0); // Pastikan jadi integer
         }
 
         return $data;

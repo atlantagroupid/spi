@@ -99,10 +99,15 @@ Route::middleware('auth')->group(function () {
     });
 
     // Customers
+    Route::middleware(['role:manager_operasional,manager_bisnis'])->group(function () {
+        Route::patch('/customers/{id}/approve', [CustomerController::class, 'approve'])->name('customers.approve');
+        Route::patch('/customers/{id}/reject', [CustomerController::class, 'reject'])->name('customers.reject');
+    });
     Route::controller(CustomerController::class)->group(function () {
         Route::get('/customers/top-list', 'listTop')->name('customers.top_list');
         Route::resource('customers', CustomerController::class);
     });
+
 
     // TOP Submissions
     Route::resource('top-submissions', TopSubmissionController::class)->only(['index', 'create', 'store']);

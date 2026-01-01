@@ -15,7 +15,22 @@ class TopSubmissionController extends Controller
     // 1. Form Pengajuan (Halaman Sales)
     public function create()
     {
-        $customers = Customer::all();
+        $user = Auth::user();
+
+        // --- FILTER CUSTOMER BERDASARKAN ROLE ---
+
+        // Cek apakah User adalah Sales (Baik Field maupun Store)
+        if (in_array($user->role, ['sales_field', 'sales_store'])) {
+            // Jika Sales: Hanya ambil customer yang user_id-nya sama dengan sales ini
+            $customers = \App\Models\Customer::where('user_id', $user->id)
+                ->orderBy('name', 'asc')
+                ->get();
+        } else {
+            // Jika Manager/Admin: Tampilkan SEMUA customer
+            $customers = \App\Models\Customer::orderBy('name', 'asc')->get();
+        }
+
+        // Return ke view create (sesuaikan nama view bapak)
         return view('top_submissions.create', compact('customers'));
     }
 
