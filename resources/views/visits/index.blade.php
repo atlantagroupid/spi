@@ -3,19 +3,49 @@
 @section('title', 'Monitoring Visit')
 
 @section('content')
+    {{-- LOGIC PHP UNTUK MENENTUKAN TAB & VISIBILITY --}}
+    @php
+        $user = Auth::user();
+        $isManager = in_array($user->role, ['manager_operasional', 'manager_bisnis']);
+        $isField   = $user->role == 'sales_field';
+        $isStore   = $user->role == 'sales_store';
+
+        // Tentukan Tab mana yang aktif duluan saat dibuka
+        // Jika Sales Toko (dan bukan manager), buka tab 'store'
+        // Selain itu (Manager / Sales Field), buka tab 'field'
+        $activeTab = ($isStore && !$isManager) ? 'store' : 'field';
+    @endphp
+
     <div class="container-fluid">
 
         <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4 gap-3">
 
             <div>
                 <h3 class="fw-bold text-primary mb-1">
-                    <i class="bi bi-bar-chart-line-fill me-2"></i>Monitoring Sales
+                    <i class="bi bi-bar-chart-line-fill me-2"></i>
+                    {{ $isManager ? 'Monitoring Sales' : 'Riwayat Kunjungan' }}
                 </h3>
-                <p class="text-muted small mb-0">Pantau pergerakan Sales Lapangan & aktivitas Sales Toko secara realtime.</p>
+                <p class="text-muted small mb-0">
+                    {{ $isManager ? 'Pantau pergerakan Sales Lapangan & aktivitas Sales Toko secara realtime.' : 'Daftar riwayat aktivitas dan kunjungan Anda.' }}
+                </p>
             </div>
 
             <div class="bg-white p-2 rounded shadow-sm border d-inline-block">
                 <form action="{{ route('visits.index') }}" method="GET" class="d-flex align-items-center gap-2">
+
+                    {{-- FILTER SALESMAN (HANYA MUNCUL BAGI MANAGER) --}}
+                    @if($isManager && isset($salesList) && count($salesList) > 0)
+                    <div class="input-group input-group-sm">
+                        <select name="sales_id" class="form-select border-primary fw-bold text-primary" style="max-width: 150px;">
+                            <option value="">Semua Sales</option>
+                            @foreach($salesList as $s)
+                                <option value="{{ $s->id }}" {{ request('sales_id') == $s->id ? 'selected' : '' }}>
+                                    {{ $s->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+                    @endif
 
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-white border-end-0 text-primary">
@@ -51,6 +81,7 @@
             </div>
         </div>
 
+        {{-- SUMMARY CARDS --}}
         <div class="row mb-4">
             <div class="col-md-4">
                 <div class="card shadow-sm border-0 border-start border-4 border-primary">
@@ -60,6 +91,9 @@
                     </div>
                 </div>
             </div>
+
+            {{-- KARTU LAPANGAN (HANYA MUNCUL JIKA MANAGER ATAU SALES FIELD) --}}
+            @if($isManager || $isField)
             <div class="col-md-4">
                 <div class="card shadow-sm border-0 border-start border-4 border-success">
                     <div class="card-body py-3">
@@ -68,6 +102,10 @@
                     </div>
                 </div>
             </div>
+            @endif
+
+            {{-- KARTU TOKO (HANYA MUNCUL JIKA MANAGER ATAU SALES TOKO) --}}
+            @if($isManager || $isStore)
             <div class="col-md-4">
                 <div class="card shadow-sm border-0 border-start border-4 border-info">
                     <div class="card-body py-3">
@@ -76,7 +114,10 @@
                     </div>
                 </div>
             </div>
+            @endif
         </div>
+
+        {{-- TABEL PENCAPAIAN BULANAN (OTOMATIS HILANG BAGI SALES KARENA $monthlyRecap NULL DARI CONTROLLER) --}}
         @if (isset($monthlyRecap) && count($monthlyRecap) > 0)
             <div class="card shadow border-0 mb-4">
                 <div class="card-header bg-white py-3">
@@ -111,22 +152,22 @@
 
                                         <td class="text-center">
                                             <span class="text-muted small">Target:</span>
-                                            <strong>{{ $recap['monthly_visit_target'] }}</strong>
+                                            <strong>{{ $recap['target_visit'] }}</strong>
                                         </td>
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
                                                 <span
-                                                    class="fw-bold {{ $recap['visit_percentage'] >= 100 ? 'text-success' : 'text-primary' }}">
+                                                    class="fw-bold {{ $recap['visit_pct'] >= 100 ? 'text-success' : 'text-primary' }}">
                                                     {{ $recap['actual_visit'] }}
                                                 </span>
                                                 <div class="progress" style="height: 6px; width: 80px;">
-                                                    <div class="progress-bar {{ $recap['visit_percentage'] >= 100 ? 'bg-success' : 'bg-primary' }}"
+                                                    <div class="progress-bar {{ $recap['visit_pct'] >= 100 ? 'bg-success' : 'bg-primary' }}"
                                                         role="progressbar"
-                                                        style="width: {{ min($recap['visit_percentage'], 100) }}%">
+                                                        style="width: {{ min($recap['visit_pct'], 100) }}%">
                                                     </div>
                                                 </div>
                                                 <small class="text-muted"
-                                                    style="font-size: 0.7rem;">{{ $recap['visit_percentage'] }}%</small>
+                                                    style="font-size: 0.7rem;">{{ $recap['visit_pct'] }}%</small>
                                             </div>
                                         </td>
 
@@ -137,17 +178,17 @@
                                         <td class="text-center">
                                             <div class="d-flex flex-column align-items-center">
                                                 <span
-                                                    class="fw-bold {{ $recap['omset_percentage'] >= 100 ? 'text-success' : ($recap['omset_percentage'] >= 50 ? 'text-warning' : 'text-danger') }}">
+                                                    class="fw-bold {{ $recap['omset_pct'] >= 100 ? 'text-success' : ($recap['omset_pct'] >= 50 ? 'text-warning' : 'text-danger') }}">
                                                     Rp {{ number_format($recap['current_omset'], 0, ',', '.') }}
                                                 </span>
                                                 <div class="progress" style="height: 6px; width: 100px;">
-                                                    <div class="progress-bar {{ $recap['omset_percentage'] >= 100 ? 'bg-success' : ($recap['omset_percentage'] >= 50 ? 'bg-warning' : 'bg-danger') }}"
+                                                    <div class="progress-bar {{ $recap['omset_pct'] >= 100 ? 'bg-success' : ($recap['omset_pct'] >= 50 ? 'bg-warning' : 'bg-danger') }}"
                                                         role="progressbar"
-                                                        style="width: {{ min($recap['omset_percentage'], 100) }}%">
+                                                        style="width: {{ min($recap['omset_pct'], 100) }}%">
                                                     </div>
                                                 </div>
                                                 <small class="text-muted"
-                                                    style="font-size: 0.7rem;">{{ $recap['omset_percentage'] }}%</small>
+                                                    style="font-size: 0.7rem;">{{ $recap['omset_pct'] }}%</small>
                                             </div>
                                         </td>
                                     </tr>
@@ -158,28 +199,41 @@
                 </div>
             </div>
         @endif
+
+        {{-- MAIN CONTENT TABS --}}
         <div class="card shadow border-0">
             <div class="card-header bg-white border-bottom-0 pt-3 pb-0">
                 <ul class="nav nav-tabs card-header-tabs" id="visitTabs" role="tablist">
+
+                    {{-- TAB LAPANGAN (FIELD) --}}
+                    @if($isManager || $isField)
                     <li class="nav-item">
-                        <button class="nav-link active fw-bold" id="field-tab" data-bs-toggle="tab"
+                        <button class="nav-link {{ $activeTab == 'field' ? 'active' : '' }} fw-bold" id="field-tab" data-bs-toggle="tab"
                             data-bs-target="#field" type="button">
                             <i class="bi bi-geo-alt-fill text-success me-1"></i> Sales Lapangan
                         </button>
                     </li>
+                    @endif
+
+                    {{-- TAB TOKO (STORE) --}}
+                    @if($isManager || $isStore)
                     <li class="nav-item">
-                        <button class="nav-link fw-bold" id="store-tab" data-bs-toggle="tab" data-bs-target="#store"
+                        <button class="nav-link {{ $activeTab == 'store' ? 'active' : '' }} fw-bold" id="store-tab" data-bs-toggle="tab" data-bs-target="#store"
                             type="button">
                             <i class="bi bi-shop text-info me-1"></i> Sales Toko
                         </button>
                     </li>
+                    @endif
+
                 </ul>
             </div>
 
             <div class="card-body">
                 <div class="tab-content" id="visitTabsContent">
 
-                    <div class="tab-pane fade show active" id="field">
+                    {{-- ISI KONTEN TAB FIELD --}}
+                    @if($isManager || $isField)
+                    <div class="tab-pane fade {{ $activeTab == 'field' ? 'show active' : '' }}" id="field">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
@@ -203,13 +257,13 @@
                                                     class="badge bg-success rounded-pill">{{ $visit->user->name }}</span>
                                             </td>
                                             <td>
-                                                <div class="fw-bold">{{ $visit->customer->name }}</div>
+                                                <div class="fw-bold">{{ $visit->customer->name ?? 'Guest' }}</div>
                                                 <small
-                                                    class="text-muted">{{ Str::limit($visit->customer->address, 30) }}</small>
+                                                    class="text-muted">{{ Str::limit($visit->customer->address ?? '-', 30) }}</small>
                                             </td>
                                             <td>
                                                 @if ($visit->latitude && $visit->longitude)
-                                                    <a href="https://www.google.com/maps/search/?api=1&query={{ $visit->latitude }},{{ $visit->longitude }}"
+                                                    <a href="https://maps.google.com/?q={{ $visit->latitude }},{{ $visit->longitude }}"
                                                         target="_blank" class="btn btn-sm btn-outline-danger">
                                                         <i class="bi bi-map"></i> Lihat Peta
                                                     </a>
@@ -223,6 +277,7 @@
                                                     <i class="bi bi-eye"></i> Detail
                                                 </button>
 
+                                                {{-- MODAL DETAIL --}}
                                                 <div class="modal fade" id="modalVisit{{ $visit->id }}"
                                                     tabindex="-1">
                                                     <div class="modal-dialog">
@@ -233,8 +288,12 @@
                                                                     data-bs-dismiss="modal"></button>
                                                             </div>
                                                             <div class="modal-body text-center">
+                                                                @if($visit->photo_path)
                                                                 <img src="{{ asset('storage/' . $visit->photo_path) }}"
                                                                     class="img-fluid rounded mb-3" alt="Foto">
+                                                                @else
+                                                                <p class="text-muted fst-italic">Tidak ada foto.</p>
+                                                                @endif
                                                                 <p class="text-start p-3 bg-light rounded">
                                                                     "{{ $visit->notes }}"</p>
                                                             </div>
@@ -253,8 +312,11 @@
                             </table>
                         </div>
                     </div>
+                    @endif
 
-                    <div class="tab-pane fade" id="store">
+                    {{-- ISI KONTEN TAB STORE --}}
+                    @if($isManager || $isStore)
+                    <div class="tab-pane fade {{ $activeTab == 'store' ? 'show active' : '' }}" id="store">
                         <div class="table-responsive">
                             <table class="table table-hover align-middle">
                                 <thead class="table-light">
@@ -278,8 +340,8 @@
                                                     class="badge bg-info text-dark rounded-pill">{{ $visit->user->name }}</span>
                                             </td>
                                             <td>
-                                                <div class="fw-bold">{{ $visit->customer->name }}</div>
-                                                <small class="text-success fw-bold">Store Visit</small>
+                                                <div class="fw-bold">{{ $visit->customer->name ?? '-' }}</div>
+                                                <span class="badge bg-secondary" style="font-size: 0.6rem;">{{ $visit->customer_category ?? 'Tamu' }}</span>
                                             </td>
                                             <td style="width: 40%;">
                                                 {{ $visit->notes }}
@@ -305,6 +367,7 @@
                             </table>
                         </div>
                     </div>
+                    @endif
 
                 </div>
             </div>

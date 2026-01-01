@@ -23,7 +23,8 @@
                 <div class="col-md-9 d-flex align-items-center">
                     <div class="alert alert-info w-100 mb-0 py-2 border-0 small">
                         <i class="bi bi-info-circle me-1"></i>
-                        <strong>Info:</strong> Halaman ini menampilkan seluruh permintaan persetujuan dari divisi Bisnis (Order/Customer) dan Gudang (Produk).
+                        <strong>Info:</strong> Halaman ini menampilkan seluruh permintaan persetujuan dari divisi Bisnis
+                        (Order/Customer) dan Gudang (Produk).
                     </div>
                 </div>
             </div>
@@ -51,7 +52,7 @@
 
                                 {{-- 2. DIVISI / TIPE --}}
                                 <td>
-                                    @if(str_contains($item->model_type, 'Order'))
+                                    @if (str_contains($item->model_type, 'Order'))
                                         <span class="badge bg-primary w-100 py-2">ORDER / TRANSAKSI</span>
                                     @elseif(str_contains($item->model_type, 'Payment'))
                                         <span class="badge bg-success w-100 py-2">KEUANGAN / PIUTANG</span>
@@ -72,29 +73,60 @@
                                     </small>
                                 </td>
 
-                                {{-- 4. KETERANGAN --}}
+                                {{-- 4. KETERANGAN (FIXED LOGIC) --}}
                                 <td>
+                                    {{-- KASUS 1: ORDER --}}
                                     @if (str_contains($item->model_type, 'Order'))
-                                        <div class="fw-bold text-primary">Invoice: {{ $item->new_data['invoice_number'] ?? '-' }}</div>
-                                        <small class="text-muted">Total: Rp {{ number_format($item->new_data['total_price'] ?? 0, 0, ',', '.') }}</small>
+                                        <div class="fw-bold text-primary">Invoice:
+                                            {{ $item->new_data['invoice_number'] ?? ($item->data['invoice_number'] ?? '-') }}</div>
+                                        <small class="text-muted">Total: Rp
+                                            {{ number_format($item->new_data['total_price'] ?? ($item->data['total_price'] ?? 0), 0, ',', '.') }}</small>
 
+                                    {{-- KASUS 2: PAYMENT --}}
                                     @elseif (str_contains($item->model_type, 'Payment'))
                                         <div class="fw-bold text-success">Pelunasan Piutang</div>
-                                        <small class="text-muted">Nominal: Rp {{ number_format($item->new_data['amount'] ?? 0, 0, ',', '.') }}</small>
+                                        <small class="text-muted">Nominal: Rp
+                                            {{ number_format($item->new_data['amount'] ?? 0, 0, ',', '.') }}</small>
 
+                                    {{-- KASUS 3: CUSTOMER (FIXED) --}}
                                     @elseif (str_contains($item->model_type, 'Customer'))
-                                        <div class="fw-bold text-dark">{{ $item->action == 'update_customer' ? 'Edit Data Toko' : 'Hapus Toko' }}</div>
-                                        <small class="text-muted">{{ $item->original_data['store_name'] ?? ($item->new_data['store_name'] ?? '-') }}</small>
+                                        @php
+                                            // Cek aksi apakah delete atau create/update
+                                            $actionLabel = 'Update Data';
+                                            if ($item->action == 'delete') { $actionLabel = 'Hapus Toko'; }
+                                            elseif ($item->action == 'create') { $actionLabel = 'Toko Baru'; }
 
+                                            // Ambil nama (bisa dari new_data atau data lama/model asli)
+                                            $storeName = $item->new_data['name'] ?? ($item->data['name'] ?? '-');
+                                        @endphp
+                                        <div class="fw-bold text-dark">{{ $actionLabel }}</div>
+                                        <small class="text-muted">{{ $storeName }}</small>
+
+                                    {{-- KASUS 4: PRODUCT (FIXED) --}}
+                                    @elseif (str_contains($item->model_type, 'Product'))
+                                        @php
+                                            $pAction = 'Update Produk';
+                                            if ($item->action == 'delete') { $pAction = 'Hapus Produk'; }
+                                            elseif ($item->action == 'create') { $pAction = 'Produk Baru'; }
+
+                                            $pName = $item->new_data['name'] ?? ($item->data['name'] ?? '-');
+                                        @endphp
+                                        <div class="fw-bold text-dark">{{ $pAction }}</div>
+                                        <small class="text-muted">{{ $pName }}</small>
+
+                                    {{-- DEFAULT --}}
                                     @else
-                                        <div class="fw-bold text-dark">{{ $item->new_data['name'] ?? ($item->original_data['name'] ?? '-') }}</div>
-                                        <small class="text-muted text-capitalize">{{ str_replace('_', ' ', $item->action) }}</small>
+                                        <div class="fw-bold text-dark">
+                                            {{ $item->new_data['name'] ?? ($item->original_data['name'] ?? '-') }}</div>
+                                        <small
+                                            class="text-muted text-capitalize">{{ str_replace('_', ' ', $item->action) }}</small>
                                     @endif
                                 </td>
 
-                                {{-- 5. AKSI (UPDATED: Pakai Script Baru) --}}
+                                {{-- 5. AKSI --}}
                                 <td class="text-center">
-                                    <button type="button" class="btn btn-outline-primary btn-sm fw-bold shadow-sm px-3 btn-review"
+                                    <button type="button"
+                                        class="btn btn-outline-primary btn-sm fw-bold shadow-sm px-3 btn-review"
                                         data-id="{{ $item->id }}">
                                         <i class="bi bi-search me-1"></i> Review
                                     </button>
@@ -132,7 +164,7 @@
                 <div class="modal-body p-0" id="modalContent"></div>
 
                 <div class="modal-footer bg-light d-flex justify-content-between">
-                      <button type="button" class="btn btn-secondary" id="btnCloseModal" data-dismiss="modal"
+                    <button type="button" class="btn btn-secondary" id="btnCloseModal" data-dismiss="modal"
                         data-bs-dismiss="modal">Tutup</button>
 
 
@@ -155,70 +187,73 @@
 
 {{-- SCRIPT DI STACK (PASTI JALAN) --}}
 @push('scripts')
-<script>
-    // SCRIPT MANUAL UNTUK TOMBOL TUTUP (Jaga-jaga jika atribut data-dismiss gagal)
+    <script>
+        // SCRIPT MANUAL UNTUK TOMBOL TUTUP (Jaga-jaga jika atribut data-dismiss gagal)
         $('#btnCloseModal').on('click', function() {
             $('#modalReview').modal('hide');
         });
-    $(document).on('click', '.btn-review', function() {
-        let id = $(this).data('id');
-        let urlDetail = "{{ route('approvals.detail', 0) }}".replace('/0', '/' + id);
-        let urlApprove = "{{ route('approvals.approve', 0) }}".replace('/0', '/' + id);
-        let urlReject = "{{ route('approvals.reject', 0) }}".replace('/0', '/' + id);
+        $(document).on('click', '.btn-review', function() {
+            let id = $(this).data('id');
+            let urlDetail = "{{ route('approvals.detail', 0) }}".replace('/0', '/' + id);
+            let urlApprove = "{{ route('approvals.approve', 0) }}".replace('/0', '/' + id);
+            let urlReject = "{{ route('approvals.reject', 0) }}".replace('/0', '/' + id);
 
-        // Reset & Update Form
-        $('#formApprove').attr('action', urlApprove);
-        $('#formReject').attr('action', urlReject);
+            // Reset & Update Form
+            $('#formApprove').attr('action', urlApprove);
+            $('#formReject').attr('action', urlReject);
 
-        // Show Modal with Loading
-        $('#modalContent').html('<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Loading...</p></div>');
-        $('#modalReview').modal('show');
+            // Show Modal with Loading
+            $('#modalContent').html(
+                '<div class="text-center py-5"><div class="spinner-border text-primary"></div><p>Loading...</p></div>'
+                );
+            $('#modalReview').modal('show');
 
-        // Fetch Content
-        $.get(urlDetail, function(data) {
-            $('#modalContent').html(data);
-        }).fail(function() {
-            $('#modalContent').html('<div class="alert alert-danger m-3">Gagal mengambil data.</div>');
+            // Fetch Content
+            $.get(urlDetail, function(data) {
+                $('#modalContent').html(data);
+            }).fail(function() {
+                $('#modalContent').html(
+                    '<div class="alert alert-danger m-3">Gagal mengambil data.</div>');
+            });
         });
-    });
 
-    // SWEETALERT APPROVE
-    $('#btnApproveAction').on('click', function(e) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'Setujui Perubahan Produk?',
-            text: "Data produk/stok akan diperbarui.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Ya, Setujui',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#1cc88a'
-        }).then((result) => {
-            if (result.isConfirmed) $('#formApprove').submit();
+        // SWEETALERT APPROVE
+        $('#btnApproveAction').on('click', function(e) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Setujui Permintaan?',
+                text: "Data akan diproses oleh sistem.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonText: 'Ya, Setujui',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#1cc88a'
+            }).then((result) => {
+                if (result.isConfirmed) $('#formApprove').submit();
+            });
         });
-    });
 
-    // SWEETALERT REJECT
-    $('#btnRejectAction').on('click', function(e) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'Tolak Pengajuan?',
-            text: "Masukkan alasan penolakan:",
-            icon: 'warning',
-            input: 'text',
-            inputPlaceholder: 'Contoh: Data tidak sesuai',
-            showCancelButton: true,
-            confirmButtonText: 'Tolak',
-            confirmButtonColor: '#e74a3b',
-            inputValidator: (value) => {
-                if (!value) return 'Alasan wajib diisi!'
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $('#reasonInput').val(result.value);
-                $('#formReject').submit();
-            }
+        // SWEETALERT REJECT
+        $('#btnRejectAction').on('click', function(e) {
+            e.preventDefault();
+            Swal.fire({
+                title: 'Tolak Pengajuan?',
+                text: "Masukkan alasan penolakan:",
+                icon: 'warning',
+                input: 'text',
+                inputPlaceholder: 'Contoh: Data tidak sesuai',
+                showCancelButton: true,
+                confirmButtonText: 'Tolak',
+                confirmButtonColor: '#e74a3b',
+                inputValidator: (value) => {
+                    if (!value) return 'Alasan wajib diisi!'
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    $('#reasonInput').val(result.value);
+                    $('#formReject').submit();
+                }
+            });
         });
-    });
-</script>
+    </script>
 @endpush

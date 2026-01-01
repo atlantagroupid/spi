@@ -19,7 +19,7 @@ class ProductController extends Controller
         // 1. Ambil data stok menipis (untuk tabel atas khusus Purchase/Manager)
         $lowStockProducts = Product::where('stock', '<=', 50)
             ->orderBy('stock', 'asc') // Urutkan dari stok paling sedikit
-            ->paginate(3, ['*'], 'alert_page');
+            ->paginate(5, ['*'], 'alert_page');
 
         // 2. Query Utama untuk Tabel Bawah
         $query = Product::query();

@@ -130,6 +130,7 @@ class VisitController extends Controller
                 'status'       => 'pending',
                 // Pastikan kolom ini ada di DB approval Bapak, kalau tidak ada, hapus baris details ini
                 'details'      => json_encode(['reason' => 'Customer Baru dari Sales Store']),
+                'data'       => $newCustomer->toArray()
             ]);
 
             $customerId = $newCustomer->id;
@@ -170,98 +171,100 @@ class VisitController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        $isManager = in_array($user->role, ['manager_operasional', 'manager_bisnis']);
 
         // --- A. PERSIAPAN FILTER (Tanggal & User) ---
-        // Default: Hari ini jika tidak ada filter tanggal
         $startDate = $request->start_date ?? date('Y-m-d');
-        $endDate = $request->end_date ?? date('Y-m-d');
+        $endDate   = $request->end_date ?? date('Y-m-d');
 
-        // Base Query: Query dasar yang belum dieksekusi
-        $baseQuery = Visit::with(['user', 'customer'])
-            ->whereBetween('created_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59'])
+        // Base Query: Query dasar (belum dieksekusi)
+        $baseQuery = \App\Models\Visit::with(['user', 'customer'])
+            ->whereDate('created_at', '>=', $startDate)
+            ->whereDate('created_at', '<=', $endDate)
             ->latest();
 
-        // Filter akses berdasarkan Role
-        if (in_array($user->role, ['sales', 'sales_field', 'sales_store'])) {
-            // Sales hanya lihat punya sendiri
+        // --- FILTER AKSES (LOGIC KUNCI) ---
+        if (!$isManager) {
+            // Jika BUKAN Manager (Sales Field / Store), PAKSA hanya lihat data sendiri
             $baseQuery->where('user_id', $user->id);
         } elseif ($request->sales_id) {
-            // Manager bisa filter spesifik sales
+            // Jika Manager memilih filter nama sales tertentu
             $baseQuery->where('user_id', $request->sales_id);
         }
 
-        // --- B. EKSEKUSI PEMISAHAN DATA (FIELD vs STORE) ---
-        // Kita clone query agar tidak saling menimpa
+        // --- B. EKSEKUSI DATA (Field vs Store) ---
+        // Kita clone $baseQuery agar filter user_id di atas tetap terbawa
+
+        // 1. Ambil Data Lapangan
         $fieldVisits = (clone $baseQuery)->where('visit_type', 'field')->get();
+
+        // 2. Ambil Data Toko (Handle legacy data yang visit_type-nya null)
         $storeVisits = (clone $baseQuery)->where(function ($q) {
             $q->where('visit_type', 'store')
-                ->orWhereNull('visit_type'); // Antisipasi data lama yg null
+              ->orWhereNull('visit_type');
         })->get();
 
-        // Hitung Ringkasan untuk Dashboard Mini
+        // Hitung Ringkasan untuk Dashboard Mini (Opsional)
         $summary = [
             'total_all'   => $fieldVisits->count() + $storeVisits->count(),
             'total_field' => $fieldVisits->count(),
             'total_store' => $storeVisits->count(),
         ];
 
-        // --- C. LOGIKA REKAP BULANAN (Target vs Actual) ---
-        // Logika ini tetap dipertahankan namun query user diperluas untuk sales_store
+        // --- C. LOGIKA REKAP BULANAN (Khusus Manager) ---
         $monthlyRecap = [];
 
-        // Hanya Manager yang butuh kalkulasi berat ini
-        if (in_array($user->role, ['manager_operasional', 'manager_bisnis'])) {
-
-            // Ambil semua tipe sales (lapangan & toko)
-            $allSales = \App\Models\User::whereIn('role', ['sales', 'sales_field', 'sales_store'])->get();
+        if ($isManager) {
+            $allSales = \App\Models\User::whereIn('role', ['sales_field', 'sales_store'])->get();
             $workingDays = 25;
 
             foreach ($allSales as $sales) {
-                // 1. Hitung Visit (Bulan Ini)
-                $actualVisits = Visit::where('user_id', $sales->id)
+                // Hitung Actual Visit Bulan Ini
+                $actualVisits = \App\Models\Visit::where('user_id', $sales->id)
                     ->whereMonth('created_at', date('m'))
                     ->whereYear('created_at', date('Y'))
-                    ->where('status', 'completed')
                     ->count();
 
+                // Hitung Target
                 $dailyTarget = $sales->daily_visit_target ?? 5;
                 $monthlyTarget = $dailyTarget * $workingDays;
-                $visitAchievement = $monthlyTarget > 0 ? ($actualVisits / $monthlyTarget) * 100 : 0;
+                $visitPercentage = $monthlyTarget > 0 ? ($actualVisits / $monthlyTarget) * 100 : 0;
 
-                // 2. Hitung Omset (Bulan Ini)
+                // Hitung Omset
                 $currentOmset = \App\Models\Order::where('user_id', $sales->id)
                     ->whereMonth('created_at', date('m'))
                     ->whereYear('created_at', date('Y'))
+                    ->whereIn('status', ['approved', 'completed', 'shipped']) // Hanya yang valid
                     ->sum('total_price');
 
-                $targetOmset = $sales->sales_target ?? 0; // Pastikan kolom ini ada di tabel users
+                $targetOmset = $sales->sales_target ?? 0;
                 $omsetPercentage = $targetOmset > 0 ? ($currentOmset / $targetOmset) * 100 : 0;
 
                 $monthlyRecap[] = [
-                    'id' => $sales->id,
                     'name' => $sales->name,
-                    'role' => $sales->role, // Tambahan info role
-                    'daily_target' => $dailyTarget,
-                    'monthly_visit_target' => $monthlyTarget,
+                    'role' => $sales->role,
                     'actual_visit' => $actualVisits,
-                    'visit_percentage' => round($visitAchievement, 1),
+                    'target_visit' => $monthlyTarget,
+                    'visit_pct' => round($visitPercentage, 1),
                     'current_omset' => $currentOmset,
                     'target_omset' => $targetOmset,
-                    'omset_percentage' => round($omsetPercentage, 1),
+                    'omset_pct' => round($omsetPercentage, 1),
                 ];
             }
         }
 
-        // --- D. KIRIM KE VIEW ---
-        // Variable salesList untuk dropdown filter di view
-        $salesList = \App\Models\User::whereIn('role', ['sales', 'sales_field', 'sales_store'])->get();
+        // --- D. DATA PENDUKUNG VIEW ---
+        // Sales list hanya dibutuhkan manager untuk dropdown filter
+        $salesList = $isManager ? \App\Models\User::whereIn('role', ['sales_field', 'sales_store'])->get() : [];
 
         return view('visits.index', compact(
             'fieldVisits',
             'storeVisits',
             'summary',
             'monthlyRecap',
-            'salesList'
+            'salesList',
+            'startDate',
+            'endDate'
         ));
     }
 

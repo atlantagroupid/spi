@@ -5,7 +5,7 @@
     <div class="card shadow mb-4 border-start-lg border-start-success">
         <div class="card-header py-3 bg-success text-white d-flex justify-content-between align-items-center">
             <h6 class="m-0 fw-bold"><i class="bi bi-cash-coin me-2"></i> Approval Pembayaran Piutang</h6>
-            <span class="badge bg-white text-success fw-bold">FINANCE</span>
+            <span class="badge bg-white text-success fw-bold">Manager Bisnis</span>
         </div>
         <div class="card-body">
             <div class="alert alert-light border border-success border-start-0 border-end-0 shadow-sm mb-4">

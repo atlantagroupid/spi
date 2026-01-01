@@ -16,7 +16,7 @@
                 <i class="bi bi-file-earmark-check me-2"></i>Daftar Pengajuan TOP
             </h5>
             <span class="badge bg-white text-success fw-bold px-3 py-2 rounded-pill">
-                MANAGER OPS / BISNIS
+                Manager Operasional
             </span>
         </div>
 

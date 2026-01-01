@@ -13,7 +13,7 @@
 
         <hr>
 
-        {{-- LOGIKA TAMPILAN --}}
+        {{-- LOGIKA TAMPILAN BERDASARKAN TIPE MODEL --}}
 
         {{-- 1. JIKA ORDER (TRANSAKSI) --}}
         @if (str_contains($approval->model_type, 'Order'))
@@ -21,17 +21,20 @@
             <table class="table table-bordered table-sm mb-3">
                 <tr>
                     <td width="30%" class="bg-light fw-bold">Customer</td>
-                    <td>{{ $data->customer->name ?? '-' }}</td>
+                    <td>{{ $data->customer->name ?? ($data['customer']['name'] ?? '-') }}</td>
                 </tr>
                 <tr>
                     <td class="bg-light fw-bold">Invoice</td>
-                    <td>{{ $data->invoice_number ?? '-' }}</td>
+                    <td>{{ $data->invoice_number ?? ($data['invoice_number'] ?? '-') }}</td>
                 </tr>
                 <tr>
                     <td class="bg-light fw-bold">Tipe Bayar</td>
-                    <td>{!! $data->payment_type == 'top'
-                        ? '<span class="badge bg-warning text-dark">TOP</span>'
-                        : '<span class="badge bg-success">CASH</span>' !!}</td>
+                    <td>
+                        @php $pType = $data->payment_type ?? ($data['payment_type'] ?? ''); @endphp
+                        {!! $pType == 'top'
+                            ? '<span class="badge bg-warning text-dark">TOP</span>'
+                            : '<span class="badge bg-success">CASH</span>' !!}
+                    </td>
                 </tr>
             </table>
 
@@ -47,24 +50,28 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($data->items ?? [] as $item)
+                        @php $items = $data->items ?? ($data['items'] ?? []); @endphp
+                        @foreach ($items as $item)
                             <tr>
-                                <td>{{ $item->product->name ?? 'Hapus' }}</td>
-                                <td class="text-center">{{ $item->quantity }}</td>
-                                <td class="text-end">{{ number_format($item->price, 0, ',', '.') }}</td>
-                                <td class="text-end fw-bold">{{ number_format($item->subtotal, 0, ',', '.') }}</td>
+                                <td>{{ $item->product->name ?? ($item['product']['name'] ?? 'Hapus') }}</td>
+                                <td class="text-center">{{ $item->quantity ?? ($item['quantity'] ?? 0) }}</td>
+                                <td class="text-end">
+                                    {{ number_format($item->price ?? ($item['price'] ?? 0), 0, ',', '.') }}</td>
+                                <td class="text-end fw-bold">
+                                    {{ number_format($item->subtotal ?? ($item['subtotal'] ?? 0), 0, ',', '.') }}</td>
                             </tr>
                         @endforeach
                         <tr>
                             <td colspan="3" class="text-end fw-bold">TOTAL TAGIHAN</td>
                             <td class="text-end fw-bold bg-warning text-dark">Rp
-                                {{ number_format($data->total_price ?? 0, 0, ',', '.') }}</td>
+                                {{ number_format($data->total_price ?? ($data['total_price'] ?? 0), 0, ',', '.') }}
+                            </td>
                         </tr>
                     </tbody>
                 </table>
             </div>
 
-            {{-- 2. JIKA PAYMENT (PIUTANG) --}}
+        {{-- 2. JIKA PAYMENT (PIUTANG) --}}
         @elseif (str_contains($approval->model_type, 'PaymentLog'))
             <h5 class="fw-bold mb-3 text-success"><i class="bi bi-cash-stack me-2"></i>Detail Pembayaran</h5>
             <div class="row">
@@ -99,7 +106,7 @@
                 </div>
             </div>
 
-            {{-- 3. JIKA PRODUCT (DATA BARANG) --}}
+        {{-- 3. JIKA PRODUCT (DATA BARANG) --}}
         @elseif (str_contains($approval->model_type, 'Product'))
             <h5 class="fw-bold mb-3 {{ $approval->action == 'delete' ? 'text-danger' : 'text-warning' }}">
                 <i class="bi bi-box-seam me-2"></i>Detail Produk
@@ -120,11 +127,9 @@
                 @endif
             </div>
 
-            {{-- TENTUKAN SUMBER DATA (Jika Hapus, ambil data lama. Jika Baru/Edit, ambil data baru) --}}
             @php
-                // Jika action delete, new_data biasanya kosong, jadi kita tampilkan data aslinya ($data)
-                $displayData = $approval->action == 'delete' ? ($data ? $data->toArray() : []) : $approval->new_data;
-                // Mapping field manual jika $data object
+                // Helper untuk handle Array/Object
+                $displayData = $approval->action == 'delete' ? ($data ? (is_array($data) ? $data : $data->toArray()) : []) : $approval->new_data;
                 $name = $displayData['name'] ?? ($data->name ?? '-');
                 $category = $displayData['category'] ?? ($data->category ?? 'Umum');
                 $price = $displayData['price'] ?? ($data->price ?? 0);
@@ -165,10 +170,62 @@
                 </tbody>
             </table>
 
-            {{-- 4. DEFAULT (JSON MENTAH) --}}
+        {{-- 4. JIKA CUSTOMER (DATA PELANGGAN BARU) --}}
+        @elseif (str_contains($approval->model_type, 'Customer'))
+            <h5 class="fw-bold mb-3 text-info">
+                <i class="bi bi-person-badge me-2"></i>Data Customer
+            </h5>
+
+            @php
+                // Helper aman untuk handle Array atau Object
+                // Karena data bisa datang dari JSON (Array) atau Model (Object)
+                $cName    = is_array($data) ? ($data['name'] ?? '-') : ($data->name ?? '-');
+                $cAddress = is_array($data) ? ($data['address'] ?? '-') : ($data->address ?? '-');
+                $cPhone   = is_array($data) ? ($data['phone'] ?? '-') : ($data->phone ?? '-');
+                $cCat     = is_array($data) ? ($data['category'] ?? '-') : ($data->category ?? 'Umum');
+                $cStatus  = is_array($data) ? ($data['status'] ?? 'Pending') : ($data->status ?? 'Pending');
+            @endphp
+
+            <div class="alert alert-info border-0 small mb-3">
+                <i class="bi bi-info-circle me-1"></i>
+                <strong>Tipe Request:</strong> <span class="badge bg-success">Customer Baru</span>
+            </div>
+
+            <table class="table table-bordered table-striped shadow-sm">
+                <thead class="bg-info text-white">
+                    <tr>
+                        <th width="35%">Atribut</th>
+                        <th>Detail Data</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td class="fw-bold bg-light">Nama Toko/Customer</td>
+                        <td class="fw-bold fs-5">{{ $cName }}</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold bg-light">Kategori</td>
+                        <td><span class="badge bg-secondary">{{ $cCat }}</span></td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold bg-light">No. HP / Telepon</td>
+                        <td>{{ $cPhone }}</td>
+                    </tr>
+                    <tr>
+                        <td class="fw-bold bg-light">Alamat</td>
+                        <td>{{ $cAddress }}</td>
+                    </tr>
+                     <tr>
+                        <td class="fw-bold bg-light">Status Saat Ini</td>
+                        <td><span class="badge bg-warning text-dark">{{ ucfirst($cStatus) }}</span></td>
+                    </tr>
+                </tbody>
+            </table>
+
+        {{-- 5. DEFAULT (JSON MENTAH) --}}
         @else
             <div class="alert alert-secondary">Data Mentah:</div>
-            <pre class="bg-light p-2 border rounded">{{ json_encode($approval->new_data, JSON_PRETTY_PRINT) }}</pre>
+            <pre class="bg-light p-2 border rounded">{{ json_encode($approval->new_data ?? $data, JSON_PRETTY_PRINT) }}</pre>
         @endif
     </div>
 @else

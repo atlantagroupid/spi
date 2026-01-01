@@ -5,7 +5,7 @@
     <div class="card shadow mb-4 border-start-lg border-start-primary">
         <div class="card-header py-3 bg-primary text-white d-flex justify-content-between align-items-center">
             <h6 class="m-0 fw-bold"><i class="bi bi-cart-check me-2"></i> Approval Transaksi (Order Baru)</h6>
-            <span class="badge bg-white text-primary fw-bold">MANAGER</span>
+            <span class="badge bg-white text-primary fw-bold">Manager Bisnis</span>
         </div>
         <div class="card-body">
             <div class="table-responsive">

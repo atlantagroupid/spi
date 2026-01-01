@@ -5,7 +5,7 @@
 <div class="card shadow mb-4 border-start-lg border-start-info">
     <div class="card-header py-3 bg-info text-white d-flex justify-content-between align-items-center">
         <h6 class="m-0 fw-bold"><i class="bi bi-people-fill me-2"></i> Approval Perubahan Customer</h6>
-        <span class="badge bg-white text-info fw-bold">ADMIN / MANAGER</span>
+        <span class="badge bg-white text-info fw-bold">Manager Bisnis</span>
     </div>
     <div class="card-body">
         <div class="table-responsive">

@@ -240,10 +240,24 @@ class ApprovalController extends Controller
 
     public function show_detail($id)
     {
-        $approval = Approval::with(['requester', 'approveable'])->findOrFail($id);
+        // 1. Ambil data approval beserta relasinya
+        // 'approveable' adalah fitur Laravel MorphTo yang otomatis mengambil model aslinya (Customer/Order/dll)
+        $approval = \App\Models\Approval::with(['requester', 'approveable'])->findOrFail($id);
+
+        // 2. LOGIKA PERBAIKAN (FALLBACK DATA)
+        // Ambil dari kolom JSON 'data' di tabel approvals
+        $dataContent = $approval->data;
+
+        // JIKA kolom JSON kosong (kasus "null" kemarin), ambil dari data asli (tabel customers)
+        if (empty($dataContent) && $approval->approveable) {
+            $dataContent = $approval->approveable->toArray();
+        }
+
+        // 3. Kembalikan ke View Partial
         return view('approvals.partials._detail_content', [
             'approval' => $approval,
-            'data'     => $approval->approveable
+            // Kita kirim variable $dataContent yang sudah pasti terisi
+            'data'     => $dataContent
         ]);
     }
 

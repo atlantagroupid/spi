@@ -46,8 +46,8 @@
                     <i class="bi bi-chevron-down"></i>
                 </div>
 
-                {{-- BODY (DEFAULT TERBUKA) --}}
-                <div class="collapse show" id="collapseLowStock">
+                {{-- BODY (DEFAULT TERTUTUP) --}}
+                <div class="collapse" id="collapseLowStock">
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-sm mb-0 align-middle">

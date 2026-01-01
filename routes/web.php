@@ -121,7 +121,7 @@ Route::middleware('auth')->group(function () {
     Route::controller(OrderController::class)->prefix('orders')->name('orders.')->group(function () {
         Route::get('/print-pdf', 'printPdf')->name('printPdf');
         Route::get('/export', 'export')->name('export');
-        Route::get('/export-list-pdf', 'exportListPdf')->name('exportListPdf');
+        Route::get('/export-list-pdf', 'exportListPdf')->name('export_list_pdf');
         Route::put('/orders/{order}/reject', [OrderController::class, 'reject'])->name('orders.reject');
         Route::get('/{id}/export-pdf', 'exportPdf')->name('exportPdf');
         Route::post('/{order}/process', 'processOrder')->name('process');

@@ -18,7 +18,7 @@
     $canViewProducts = in_array($userRole, ['manager_operasional', 'kepala_gudang', 'admin_gudang', 'purchase']);
     $canViewCustomers = !in_array($userRole, ['kepala_gudang', 'admin_gudang', 'purchase']);
     $canManageUsers = $isManagerOperasional;
-
+    $cannotViewManajemenInternal = !in_array($userRole, ['kasir', 'purchase', 'sales_store', 'sales_field', 'finance']);
     // PERBAIKAN DISINI: Tambahkan $isAnySales agar Sales Lapangan bisa lihat menu Visit
     $canViewVisits = $isAnySales || in_array($userRole, ['manager_operasional', 'manager_bisnis']);
 
@@ -96,7 +96,7 @@
                     @if ($isSalesField)
                         <li><a href="{{ route('visits.plan') }}"
                                 class="{{ request()->is('visits/plan') ? 'active' : '' }}">Rencana Visit</a></li>
-                    @else
+                    @elseif ($isSalesStore)
                         <li><a href="{{ route('visits.plan') }}"
                                 class="{{ request()->is('visits/create') ? 'active' : '' }}">Create Visit</a></li>
                     @endif
@@ -178,9 +178,11 @@
                 </ul>
             </li>
         @endif
+        @if ($cannotViewManajemenInternal)
 
         {{-- Manajemen Internal --}}
         <li class="sidebar-heading">Manajemen Internal</li>
+        @endif
 
         @if ($canViewProducts)
             <li>

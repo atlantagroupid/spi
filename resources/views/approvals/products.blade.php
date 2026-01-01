@@ -5,7 +5,7 @@
     <div class="card shadow mb-4 border-start-lg border-start-warning">
         <div class="card-header py-3 bg-warning text-dark d-flex justify-content-between align-items-center">
             <h6 class="m-0 fw-bold"><i class="bi bi-box-seam me-2"></i> Approval Produk / Stok</h6>
-            <span class="badge bg-white text-dark fw-bold">GUDANG / MANAGER</span>
+            <span class="badge bg-white text-dark fw-bold">Kepala Gudang</span>
         </div>
         <div class="card-body">
             <div class="table-responsive">
