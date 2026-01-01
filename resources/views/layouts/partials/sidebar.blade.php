@@ -55,7 +55,7 @@
         <div class="sidebar-brand-icon">
             <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center p-1"
                 style="width: 42px; height: 42px;">
-                <img src="{{ asset('images/Logo.png') }}" alt="Logo" class="img-fluid"
+                <img src="{{ asset('images/logo.png') }}" alt="Logo" class="img-fluid"
                     style="max-height: 28px; width: auto;"
                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
                 <i class="bi bi-building-fill text-primary fs-5" style="display: none;"></i>
@@ -179,9 +179,8 @@
             </li>
         @endif
         @if ($cannotViewManajemenInternal)
-
-        {{-- Manajemen Internal --}}
-        <li class="sidebar-heading">Manajemen Internal</li>
+            {{-- Manajemen Internal --}}
+            <li class="sidebar-heading">Manajemen Internal</li>
         @endif
 
         @if ($canViewProducts)
