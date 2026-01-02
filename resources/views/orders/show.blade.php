@@ -3,26 +3,28 @@
 @section('title', 'Detail Order #' . $order->invoice_number)
 
 @section('content')
-<div class="container pb-5">
+<div class="container-fluid px-0 px-md-3 pb-5">
 
     {{-- HEADER & NAVIGASI --}}
     <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-2 d-print-none">
-        @php
-            if (request('source') == 'approval') {
-                $backRoute = route('approvals.transaksi');
-                $backLabel = 'Kembali ke Approval';
-            } else {
-                $backRoute = route('orders.index');
-                $backLabel = 'Kembali';
-            }
-        @endphp
+        <div class="d-flex gap-2 w-100 w-md-auto">
+            @php
+                if (request('source') == 'approval') {
+                    $backRoute = route('approvals.transaksi');
+                    $backLabel = 'Kembali ke Approval';
+                } else {
+                    $backRoute = route('orders.index');
+                    $backLabel = 'Kembali';
+                }
+            @endphp
 
-        <a href="{{ $backRoute }}" class="btn btn-secondary shadow-sm btn-sm-mobile">
-            <i class="bi bi-arrow-left me-2"></i> {{ $backLabel }}
-        </a>
+            <a href="{{ $backRoute }}" class="btn btn-secondary shadow-sm flex-fill flex-md-grow-0">
+                <i class="bi bi-arrow-left me-2"></i> {{ $backLabel }}
+            </a>
+        </div>
 
         @if (Auth::user()->role !== 'sales')
-            <button onclick="window.print()" class="btn btn-outline-dark btn-sm-mobile">
+            <button onclick="window.print()" class="btn btn-outline-dark w-100 w-md-auto mt-2 mt-md-0">
                 <i class="bi bi-printer me-1"></i> Cetak Invoice
             </button>
         @endif
@@ -30,7 +32,7 @@
 
     {{-- ALERT STATUS PENGIRIMAN --}}
     @if (in_array($order->status, ['shipped', 'delivered', 'completed']) && $order->delivery_proof)
-        <div class="alert alert-info shadow-sm border-0 p-3 p-md-4 mb-4 d-print-none">
+        <div class="alert alert-info shadow-sm border-0 p-3 p-md-4 mb-4 d-print-none rounded-3">
             <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-3">
                 <div class="d-flex align-items-center w-100">
                     <div class="bg-white p-3 rounded-circle text-primary me-3 shadow-sm d-none d-md-block">
@@ -69,7 +71,7 @@
     {{-- PANEL EKSEKUSI MANAGER --}}
     @if (in_array(Auth::user()->role, ['manager_operasional', 'manager_bisnis']) && $order->status == 'pending_approval')
         @php $ticket = $order->latestApproval; @endphp
-        <div class="card shadow border-0 mb-4 bg-warning bg-opacity-10 d-print-none">
+        <div class="card shadow border-0 mb-4 bg-warning bg-opacity-10 d-print-none rounded-3">
             <div class="card-body p-3 p-md-4">
                 <div class="d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
                     <div class="text-center text-md-start">
@@ -98,7 +100,7 @@
 
     {{-- PANEL KASIR (UPLOAD SURAT JALAN) --}}
     @if (Auth::user()->role == 'kasir' && in_array($order->status, ['approved', 'processed', 'shipped']))
-        <div class="card border-0 shadow-sm mb-4 bg-primary bg-opacity-10 d-print-none">
+        <div class="card border-0 shadow-sm mb-4 bg-primary bg-opacity-10 d-print-none rounded-3">
             <div class="card-body p-3 p-md-4">
                 <h6 class="fw-bold text-primary mb-3">
                     <i class="bi bi-truck me-2"></i>
@@ -119,7 +121,7 @@
                             <input type="hidden" name="is_revision" value="0">
                         </div>
                         <div class="col-12 col-md-3">
-                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 mt-md-0">
+                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 mt-md-0 shadow-sm">
                                 <i class="bi bi-upload me-1"></i>
                                 {{ $order->status == 'shipped' ? 'Update Data' : 'Proses Jalan' }}
                             </button>
@@ -132,7 +134,7 @@
 
     {{-- INFO ORDER DITOLAK (SALES ONLY) --}}
     @if ($order->status == 'rejected')
-        <div class="alert alert-danger shadow-sm border-start border-5 border-danger fade show d-print-none p-3 p-md-4 mb-4" role="alert">
+        <div class="alert alert-danger shadow-sm border-start border-5 border-danger fade show d-print-none p-3 p-md-4 mb-4 rounded-3" role="alert">
             <h5 class="alert-heading fw-bold d-flex align-items-center">
                 <i class="bi bi-x-circle-fill me-2 fs-4"></i>Order Ditolak!
             </h5>
@@ -151,7 +153,7 @@
     @endif
 
     {{-- AREA INVOICE --}}
-    <div class="card shadow-lg border-0" id="printArea">
+    <div class="card shadow-lg border-0 rounded-3" id="printArea">
         <div class="card-body p-4 p-md-5">
 
             {{-- HEADER INVOICE --}}
@@ -168,11 +170,11 @@
                             default => 'primary',
                         };
                     @endphp
-                    <span class="badge bg-{{ $badgeColor }} text-uppercase">{{ str_replace('_', ' ', $order->status) }}</span>
+                    <span class="badge bg-{{ $badgeColor }} text-uppercase px-3 py-2 rounded-pill">{{ str_replace('_', ' ', $order->status) }}</span>
                 </div>
 
                 {{-- INFO PEMBAYARAN --}}
-                <div class="alert alert-light border shadow-sm p-3 w-100 w-md-50">
+                <div class="alert alert-light border shadow-sm p-3 w-100 w-md-50 rounded-3">
                     @if ($order->payment_type == 'kredit' || $order->payment_type == 'top')
                         <div class="d-flex align-items-center mb-1">
                             <span class="badge bg-primary me-2">TOP / KREDIT</span>
@@ -196,8 +198,8 @@
             <div class="row mb-4 g-3">
                 <div class="col-12 col-md-6">
                     <h6 class="text-uppercase text-secondary small fw-bold mb-2">Tagihan Kepada:</h6>
-                    <div class="bg-light p-3 rounded">
-                        <h5 class="fw-bold mb-1">{{ $order->customer->name }}</h5>
+                    <div class="bg-light p-3 rounded-3 border">
+                        <h5 class="fw-bold mb-1 text-dark">{{ $order->customer->name }}</h5>
                         <p class="text-muted small mb-0">
                             {{ $order->customer->address }}<br>
                             <i class="bi bi-telephone me-1"></i> {{ $order->customer->phone }}
@@ -206,7 +208,7 @@
                 </div>
                 <div class="col-12 col-md-6 text-md-end">
                     <h6 class="text-uppercase text-secondary small fw-bold mb-2">Penerbit:</h6>
-                    <h5 class="fw-bold mb-1">Bintang Interior & Keramik</h5>
+                    <h5 class="fw-bold mb-1 text-dark">Bintang Interior & Keramik</h5>
                     <p class="text-muted small mb-0">
                         Banda Aceh, Indonesia<br>
                         Sales: <strong>{{ $order->user->name }}</strong>
@@ -220,7 +222,7 @@
             <div class="d-block d-md-none">
                 <h6 class="fw-bold text-secondary border-bottom pb-2 mb-3">Item Pesanan</h6>
                 @foreach ($order->items as $item)
-                    <div class="card mb-3 border bg-light">
+                    <div class="card mb-3 border bg-light shadow-sm">
                         <div class="card-body p-3">
                             <div class="d-flex justify-content-between mb-2">
                                 <span class="fw-bold text-dark">{{ $item->product->name }}</span>
@@ -234,15 +236,15 @@
                     </div>
                 @endforeach
                 <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-3">
-                    <span class="fw-bold">TOTAL TAGIHAN</span>
-                    <span class="fw-bold fs-5 text-primary">Rp {{ number_format($order->total_price, 0, ',', '.') }}</span>
+                    <span class="fw-bold text-dark">TOTAL TAGIHAN</span>
+                    <span class="fw-bold fs-4 text-primary">Rp {{ number_format($order->total_price, 0, ',', '.') }}</span>
                 </div>
             </div>
 
             {{-- TAMPILAN DESKTOP (TABLE) --}}
             <div class="table-responsive d-none d-md-block">
                 <table class="table table-bordered border-light align-middle">
-                    <thead class="bg-light">
+                    <thead class="bg-light text-secondary">
                         <tr>
                             <th class="py-3 ps-3">Deskripsi Barang</th>
                             <th class="text-center py-3" width="100">Qty</th>
@@ -282,7 +284,7 @@
 
             {{-- CATATAN --}}
             @if ($order->notes)
-                <div class="mt-4 p-3 bg-light rounded border border-light">
+                <div class="mt-4 p-3 bg-light rounded-3 border border-light">
                     <small class="fw-bold text-secondary d-block mb-1">Catatan:</small>
                     <span class="text-muted small">{{ $order->notes }}</span>
                 </div>
@@ -292,7 +294,7 @@
     </div>
 </div>
 
-{{-- MODAL REJECT (SALIN DARI SEBELUMNYA) --}}
+{{-- MODAL REJECT --}}
 @if (isset($ticket))
     <div class="modal fade" id="modalReject" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
@@ -319,22 +321,18 @@
     </div>
 @endif
 
-{{-- CSS KHUSUS PRINT & MOBILE --}}
+{{-- CSS PRINT & MOBILE --}}
 <style>
-    /* Styling Mobile agar tombol full width di layar kecil */
-    @media (max-width: 576px) {
-        .btn-sm-mobile { width: 100%; margin-bottom: 5px; }
-        .d-flex.gap-2 { flex-direction: column; }
-    }
-
     @media print {
         body * { visibility: hidden; }
         #printArea, #printArea * { visibility: visible; }
         #printArea { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; box-shadow: none !important; }
         .d-print-none { display: none !important; }
-        /* Saat print, paksa gunakan tampilan tabel (desktop) agar rapi di kertas */
+
+        /* Paksa tampilan tabel desktop saat print */
         .d-md-none { display: none !important; }
         .d-none.d-md-block { display: table !important; width: 100%; }
+
         .card { border: none !important; }
         .badge { border: 1px solid #000; color: #000 !important; background: none !important; }
     }

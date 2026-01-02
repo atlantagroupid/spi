@@ -18,7 +18,11 @@ class DashboardController extends Controller
     public function index()
     {
         Visit::runAutoCutoff();
-        $user = Auth::user();
+
+        // FIX: Tambahkan fresh() agar data user (terutama credit_limit) selalu ambil terbaru dari DB
+        // Bukan dari cache session yang mungkin belum update setelah approval.
+        $user = Auth::user()->fresh();
+
         $role = $user->role;
 
         // 1. SALES (Tetap)
@@ -101,6 +105,7 @@ class DashboardController extends Controller
         }
 
         // 3. Plafon Kredit (Sisa Limit) - BERLAKU KEDUANYA
+        // Karena $user sudah di-fresh() di index(), nilai ini PASTI akurat
         $limitQuota = $user->credit_limit_quota ?? 0;
         $usedCredit = 0;
         $remaining = 0;
@@ -119,6 +124,8 @@ class DashboardController extends Controller
             }
 
             $remaining = $limitQuota - $usedCredit;
+
+            // Logika Alert: Jika sisa limit < 20%
             if (($remaining / $limitQuota) * 100 < 20) {
                 $isCritical = true;
             }

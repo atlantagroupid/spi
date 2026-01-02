@@ -3,390 +3,307 @@
 @section('title', 'Data Produk')
 
 @section('content')
-    {{-- HEADER HALAMAN --}}
-    <div class="d-flex justify-content-between align-items-center mb-4">
+<div class="container-fluid px-0 px-md-3">
+
+    {{-- HEADER & TOMBOL TAMBAH --}}
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-3 mb-md-4 gap-3">
         <div>
-            <h1 class="h3 mb-0 text-gray-800">Data Produk & Stok</h1>
-            {{-- INFO TOTAL ASET --}}
-            <div class="mt-1 small text-muted">
-                <span class="me-3">
-                    <i class="bi bi-cash-stack me-1"></i> Total Aset:
-                    <span class="fw-bold text-success">
-                        Rp {{ number_format($totalAsset ?? 0, 0, ',', '.') }}
-                    </span>
-                </span>
+            <h4 class="fw-bold text-gray-800 mb-1">Data Produk & Stok</h4>
+            <div class="small text-muted d-flex gap-3 align-items-center">
                 <span>
-                    <i class="bi bi-box-seam me-1"></i> Total Stok:
-                    <span class="fw-bold text-primary">
-                        {{ number_format($totalStock ?? 0, 0, ',', '.') }} Unit
-                    </span>
+                    <i class="bi bi-cash-stack me-1"></i>Aset:
+                    <span class="fw-bold text-success">Rp {{ number_format($totalAsset ?? 0, 0, ',', '.') }}</span>
+                </span>
+                <span class="border-start ps-3">
+                    <i class="bi bi-box-seam me-1"></i>Stok:
+                    <span class="fw-bold text-primary">{{ number_format($totalStock ?? 0, 0, ',', '.') }}</span>
                 </span>
             </div>
         </div>
 
-        {{-- TOMBOL TAMBAH PRODUK (Role Tertentu) --}}
         @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
-            <a href="{{ route('products.create') }}" class="btn btn-primary shadow-sm">
+            <a href="{{ route('products.create') }}" class="btn btn-primary shadow-sm w-100 w-md-auto">
                 <i class="bi bi-plus-lg me-2"></i> Tambah Produk
             </a>
         @endif
     </div>
 
-    {{-- 1. TABEL ALERT STOK MENIPIS (ACCORDION) --}}
-    @if (in_array(Auth::user()->role, ['purchase', 'manager_operasional', 'kepala_gudang']))
-        @if (isset($lowStockProducts) && $lowStockProducts->count() > 0)
-            <div class="card border-warning mb-4 shadow-sm">
-                {{-- HEADER (KLIK UNTUK BUKA/TUTUP) --}}
-                <div class="card-header bg-warning bg-opacity-10 fw-bold text-warning-emphasis d-flex justify-content-between align-items-center"
-                    style="cursor: pointer;" data-bs-toggle="collapse" data-bs-target="#collapseLowStock"
-                    aria-expanded="true" aria-controls="collapseLowStock">
-                    <span>
-                        <i class="bi bi-exclamation-triangle-fill me-2"></i> Perlu Restock (Stok Menipis)
-                    </span>
-                    <i class="bi bi-chevron-down"></i>
-                </div>
-
-                {{-- BODY (DEFAULT TERTUTUP) --}}
-                <div class="collapse" id="collapseLowStock">
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0 align-middle">
-                                <thead class="bg-light">
-                                    <tr>
-                                        <th class="ps-3">Produk</th>
-                                        <th class="text-center">Sisa Stok</th>
-                                        <th>Status Pemesanan</th>
-                                        <th class="text-end pe-3">Aksi</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($lowStockProducts as $item)
-                                        <tr>
-                                            <td class="ps-3 fw-bold">{{ $item->name }}</td>
-                                            <td class="text-center">
-                                                <span class="badge bg-danger">{{ $item->stock }} Unit</span>
-                                            </td>
-                                            <td>
-                                                @if ($item->restock_date)
-                                                    <span class="badge bg-info text-dark border border-info">
-                                                        <i class="bi bi-calendar-check me-1"></i>
-                                                        Dipesan: {{ date('d/m/Y', strtotime($item->restock_date)) }}
-                                                    </span>
-                                                @else
-                                                    <span class="badge bg-secondary opacity-50">Belum Pesan</span>
-                                                @endif
-                                            </td>
-                                            <td class="text-end pe-3">
-                                                {{-- Tombol Update Info Restock --}}
-                                                <button class="btn btn-sm btn-outline-primary"
-                                                    onclick="event.stopPropagation(); openRestockModal('{{ $item->id }}', '{{ $item->name }}', '{{ $item->restock_date }}')">
-                                                    <i class="bi bi-pencil-square"></i> Update Info
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {{-- FOOTER PAGINATION --}}
-                    @if ($lowStockProducts->hasPages())
-                        <div class="card-footer bg-white py-2">
-                            <div class="d-flex justify-content-center">
-                                {{-- Gunakan pagination simple Bootstrap --}}
-                                {{ $lowStockProducts->appends(request()->query())->links('pagination::bootstrap-4') }}
+    {{-- ALERT STOK MENIPIS (ACCORDION) --}}
+    @if (in_array(Auth::user()->role, ['purchase', 'manager_operasional', 'kepala_gudang']) && isset($lowStockProducts) && $lowStockProducts->count() > 0)
+        <div class="card border-warning mb-4 shadow-sm rounded-3 overflow-hidden">
+            <div class="card-header bg-warning bg-opacity-10 fw-bold text-warning-emphasis d-flex justify-content-between align-items-center clickable"
+                data-bs-toggle="collapse" data-bs-target="#collapseLowStock" style="cursor: pointer;">
+                <span><i class="bi bi-exclamation-triangle-fill me-2"></i> Perlu Restock ({{ $lowStockProducts->total() }})</span>
+                <i class="bi bi-chevron-down"></i>
+            </div>
+            <div class="collapse show" id="collapseLowStock"> {{-- Default Show agar terlihat --}}
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        @foreach ($lowStockProducts as $item)
+                            <div class="list-group-item d-flex justify-content-between align-items-center p-3">
+                                <div>
+                                    <div class="fw-bold text-dark">{{ $item->name }}</div>
+                                    <small class="text-danger fw-bold">Sisa: {{ $item->stock }} Unit</small>
+                                    @if ($item->restock_date)
+                                        <div class="small text-muted"><i class="bi bi-clock-history me-1"></i>Pesan: {{ date('d/m/y', strtotime($item->restock_date)) }}</div>
+                                    @endif
+                                </div>
+                                <button class="btn btn-sm btn-outline-primary rounded-pill px-3"
+                                    onclick="openRestockModal('{{ $item->id }}', '{{ $item->name }}', '{{ $item->restock_date }}')">
+                                    Update
+                                </button>
                             </div>
+                        @endforeach
+                    </div>
+                    @if ($lowStockProducts->hasPages())
+                        <div class="p-2 text-center bg-light">
+                            <small class="text-muted">Lihat halaman selanjutnya di bawah...</small>
                         </div>
                     @endif
                 </div>
             </div>
-        @endif
+        </div>
     @endif
 
-    {{-- 2. FILTER PENCARIAN --}}
-    <div class="card mb-4 border-0 shadow-sm">
-        <div class="card-body">
-            <form action="{{ route('products.index') }}" method="GET" class="row g-2 align-items-center">
-                {{-- Input Cari --}}
-                <div class="col-md-4">
-                    <input type="text" name="search" class="form-control" placeholder="Cari nama produk..."
-                        value="{{ request('search') }}">
-                </div>
-                {{-- Dropdown Kategori --}}
-                <div class="col-md-3">
-                    <select name="category" class="form-select" onchange="this.form.submit()">
-                        <option value="">- Semua Kategori -</option>
-                        @foreach ($categories as $cat)
-                            <option value="{{ $cat }}" {{ request('category') == $cat ? 'selected' : '' }}>
-                                {{ $cat }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-                {{-- Dropdown Harga --}}
-                <div class="col-md-2">
-                    <select name="is_discount" class="form-select" onchange="this.form.submit()">
-                        <option value="">- Harga -</option>
-                        <option value="1" {{ request('is_discount') == '1' ? 'selected' : '' }}>🏷️ Diskon</option>
-                    </select>
-                </div>
-                {{-- Tombol Action (Cari & Reset) --}}
-                <div class="col-md-3 col-12 d-flex gap-2">
-                    <button type="submit" class="btn btn-primary flex-grow-1">
-                        <i class="bi bi-search me-1"></i> Cari
-                    </button>
-
-                    @if (request('search') || request('category') || request('is_discount'))
-                        <a href="{{ route('products.index') }}" class="btn btn-danger" title="Reset Filter">
-                            <i class="bi bi-x-lg"></i>
-                        </a>
-                    @else
-                        <a href="{{ route('products.index') }}" class="btn btn-light border" title="Refresh Data">
-                            <i class="bi bi-arrow-counterclockwise"></i>
-                        </a>
-                    @endif
-                </div>
-            </form>
+    {{-- FILTER PENCARIAN (COLLAPSIBLE DI MOBILE) --}}
+    <div class="card border-0 shadow-sm mb-4 rounded-3">
+        <div class="card-header bg-white py-3 d-flex justify-content-between align-items-center d-md-none" data-bs-toggle="collapse" data-bs-target="#filterCollapse">
+            <h6 class="m-0 fw-bold text-primary"><i class="bi bi-funnel me-2"></i>Filter Produk</h6>
+            <i class="bi bi-chevron-down"></i>
         </div>
-    </div>
-
-    {{-- 3. TABEL UTAMA DATA PRODUK --}}
-    <div class="card border-0 shadow-sm">
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0">
-                    <thead class="bg-light">
-                        <tr>
-                            <th class="ps-4 py-3" width="80">Gambar</th>
-                            <th>Nama Produk</th>
-                            <th>Kategori</th>
-                            <th>Lokasi</th>
-
-                            @if (Auth::user()->role === 'purchase')
-                                <th>Harga Normal</th>
-                                <th style="width: 200px;" class="text-danger bg-danger bg-opacity-10">Set Diskon</th>
-                            @else
-                                <th>Harga Satuan</th>
-                            @endif
-
-                            <th class="text-center">Stok</th>
-
-                            @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
-                                <th class="text-center pe-4" width="100">Aksi</th>
-                            @endif
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @forelse($products as $product)
-                            {{-- KOLOM GAMBAR (OPTIMIZED) --}}
-                            <td class="text-center" style="width: 80px;">
-                                @if ($product->image)
-                                    {{-- JIKA ADA GAMBAR --}}
-                                    <a href="#" data-bs-toggle="modal" data-bs-target="#imgModal{{ $product->id }}">
-                                        <img src="{{ asset('storage/products/' . $product->image) }}"
-                                            alt="{{ $product->name }}" class="rounded border shadow-sm" width="50"
-                                            height="50" loading="lazy" {{-- FITUR LAZY LOAD --}}
-                                            style="object-fit: cover; cursor: pointer;">
-                                    </a>
-
-                                    {{-- MODAL PREVIEW --}}
-                                    <div class="modal fade" id="imgModal{{ $product->id }}" tabindex="-1">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h6 class="modal-title fw-bold text-truncate" style="max-width: 90%;">
-                                                        {{ $product->name }}
-                                                    </h6>
-                                                    <button type="button" class="btn-close"
-                                                        data-bs-dismiss="modal"></button>
-                                                </div>
-                                                <div class="modal-body text-center p-0 bg-light">
-                                                    <img src="{{ asset('storage/products/' . $product->image) }}"
-                                                        class="img-fluid" loading="lazy" {{-- LAZY JUGA DI MODAL --}}
-                                                        style="max-height: 500px;">
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @else
-                                    {{-- JIKA TIDAK ADA GAMBAR (FALLBACK ICON) --}}
-                                    <div class="d-flex align-items-center justify-content-center bg-secondary bg-opacity-10 rounded border"
-                                        style="width: 50px; height: 50px; margin: 0 auto;" title="Tidak ada gambar">
-                                        <i class="bi bi-card-image text-secondary fs-5"></i>
-                                    </div>
-                                @endif
-                            </td>
-
-                            {{-- NAMA --}}
-                            <td>
-                                <div class="fw-bold text-dark">{{ $product->name }}</div>
-                            </td>
-
-                            {{-- KATEGORI --}}
-                            <td><span class="badge bg-light text-dark border">{{ $product->category }}</span></td>
-
-                            {{-- LOKASI --}}
-                            <td>
-                                <div class="small lh-sm">
-                                    <div class="fw-bold">{{ $product->lokasi_gudang ?? 'N/A' }}</div>
-                                    <div class="text-muted">
-                                        @if ($product->gate)
-                                            Gate: {{ $product->gate }}
-                                        @endif
-                                        @if ($product->gate && $product->block)
-                                            |
-                                        @endif
-                                        @if ($product->block)
-                                            Block: {{ $product->block }}
-                                        @endif
-                                    </div>
-                                </div>
-                            </td>
-
-                            {{-- HARGA (LOGIKA ROLE) --}}
-                            @if (Auth::user()->role === 'purchase')
-                                <td>Rp {{ number_format($product->price, 0, ',', '.') }}</td>
-                                <td class="bg-danger bg-opacity-10">
-                                    <form action="{{ route('products.updateDiscount', $product->id) }}" method="POST"
-                                        class="d-flex gap-1">
-                                        @csrf
-                                        <input type="number" name="discount_price" min="0"
-                                            class="form-control form-control-sm border-danger text-danger fw-bold"
-                                            value="{{ $product->discount_price == 0 ? '' : $product->discount_price }}"
-                                            placeholder="No Disc">
-                                        <button type="submit" class="btn btn-sm btn-danger shadow-sm">
-                                            <i class="bi bi-check-lg"></i>
-                                        </button>
-                                    </form>
-                                </td>
-                            @else
-                                <td>
-                                    @if ($product->discount_price && $product->discount_price > 0)
-                                        <div class="text-decoration-line-through text-muted small">
-                                            Rp {{ number_format($product->price, 0, ',', '.') }}
-                                        </div>
-                                        <div class="fw-bold text-danger">
-                                            Rp {{ number_format($product->discount_price, 0, ',', '.') }}
-                                        </div>
-                                    @else
-                                        <div class="fw-bold text-primary">
-                                            Rp {{ number_format($product->price, 0, ',', '.') }}
-                                        </div>
-                                    @endif
-                                </td>
-                            @endif
-
-                            {{-- STOK --}}
-                            <td class="text-center">
-                                <span class="badge {{ $product->stock <= 10 ? 'bg-warning text-dark' : 'bg-success' }}">
-                                    {{ $product->stock }}
-                                </span>
-                            </td>
-
-                            {{-- AKSI (EDIT/DELETE) --}}
-                            @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
-                                <td class="text-center">
-                                    <div class="d-flex justify-content-center gap-1">
-                                        <a href="{{ route('products.edit', $product->id) }}"
-                                            class="btn btn-sm btn-outline-primary" title="Edit">
-                                            <i class="bi bi-pencil-square"></i>
-                                        </a>
-                                        <form action="{{ route('products.destroy', $product->id) }}" method="POST"
-                                            class="d-inline"
-                                            onsubmit="return confirm('Hapus data produk ini? Data tidak bisa dikembalikan.');">
-                                            @csrf
-                                            @method('DELETE')
-                                            <button type="submit" class="btn btn-sm btn-danger shadow-sm"
-                                                title="Hapus">
-                                                <i class="bi bi-trash"></i>
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            @endif
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="7" class="text-center py-4 text-muted">Tidak ada data produk ditemukan.
-                                </td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            <div class="p-3">
-                {{ $products->links() }}
-            </div>
-        </div>
-    </div>
-
-    {{-- MODAL UPDATE RESTOCK (FIXED METHOD) --}}
-    <div class="modal fade" id="restockModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <form id="restockForm" method="POST">
-                    @csrf
-                    {{-- PERBAIKAN: Tambahkan @method('PATCH') karena Route::patch --}}
-                    @method('PATCH')
-
-                    <div class="modal-header bg-light">
-                        <h5 class="modal-title">
-                            <i class="bi bi-box-seam me-2"></i>Update Restock
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-
-                    <div class="modal-body">
-                        <div class="mb-3 text-center">
-                            <h6 class="text-muted small uppercase">Nama Produk</h6>
-                            <h4 class="fw-bold text-primary" id="modalProductName">...</h4>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold small">Tanggal Estimasi Barang Masuk</label>
-                            <input type="date" name="restock_date" id="modalRestockDate" class="form-control"
-                                required>
-                            <div class="form-text text-muted small">
-                                Pilih tanggal kapan stok baru diperkirakan tiba di gudang.
+        <div class="collapse d-md-block" id="filterCollapse">
+            <div class="card-body p-3">
+                <form action="{{ route('products.index') }}" method="GET">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                            <div class="input-group">
+                                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                                <input type="text" name="search" class="form-control border-start-0 ps-0" placeholder="Cari nama produk..." value="{{ request('search') }}">
                             </div>
                         </div>
-                    </div>
-
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-primary btn-sm fw-bold">
-                            <i class="bi bi-save me-1"></i> Simpan Jadwal
-                        </button>
+                        <div class="col-6 col-md-3">
+                            <select name="category" class="form-select" onchange="this.form.submit()">
+                                <option value="">- Semua Kategori -</option>
+                                @foreach ($categories as $cat)
+                                    <option value="{{ $cat }}" {{ request('category') == $cat ? 'selected' : '' }}>{{ $cat }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <select name="is_discount" class="form-select" onchange="this.form.submit()">
+                                <option value="">- Harga -</option>
+                                <option value="1" {{ request('is_discount') == '1' ? 'selected' : '' }}>🏷️ Diskon</option>
+                            </select>
+                        </div>
+                        <div class="col-12 col-md-3 d-flex gap-2">
+                            <button type="submit" class="btn btn-primary flex-fill fw-bold">Terapkan</button>
+                            @if (request()->anyFilled(['search', 'category', 'is_discount']))
+                                <a href="{{ route('products.index') }}" class="btn btn-outline-danger" title="Reset"><i class="bi bi-x-lg"></i></a>
+                            @endif
+                        </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
-    {{-- 5. SCRIPT PENDUKUNG & MODAL --}}
+    {{-- LIST PRODUK --}}
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+
+        {{-- TAMPILAN DESKTOP (TABLE) --}}
+        <div class="table-responsive d-none d-md-block">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="bg-light text-secondary small text-uppercase">
+                    <tr>
+                        <th class="ps-4" width="80">Foto</th>
+                        <th>Nama Produk</th>
+                        <th>Kategori</th>
+                        <th>Lokasi</th>
+                        <th>Harga</th>
+                        <th class="text-center">Stok</th>
+                        @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                            <th class="text-center pe-4">Aksi</th>
+                        @endif
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($products as $product)
+                        <tr>
+                            <td class="ps-4">
+                                @if ($product->image)
+                                    <img src="{{ asset('storage/products/' . $product->image) }}" class="rounded border" width="50" height="50" style="object-fit: cover; cursor: pointer;" data-bs-toggle="modal" data-bs-target="#imgModal{{ $product->id }}">
+                                @else
+                                    <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted" style="width: 50px; height: 50px;"><i class="bi bi-image"></i></div>
+                                @endif
+                            </td>
+                            <td>
+                                <div class="fw-bold text-dark">{{ $product->name }}</div>
+                            </td>
+                            <td><span class="badge bg-light text-dark border">{{ $product->category }}</span></td>
+                            <td class="small text-muted">
+                                {{ $product->lokasi_gudang ?? '-' }}
+                                @if($product->gate) / {{ $product->gate }} @endif
+                                @if($product->block) / {{ $product->block }} @endif
+                            </td>
+                            <td>
+                                @if ($product->discount_price > 0)
+                                    <div class="text-decoration-line-through text-muted small">Rp {{ number_format($product->price, 0, ',', '.') }}</div>
+                                    <div class="fw-bold text-danger">Rp {{ number_format($product->discount_price, 0, ',', '.') }}</div>
+                                @else
+                                    <div class="fw-bold text-primary">Rp {{ number_format($product->price, 0, ',', '.') }}</div>
+                                @endif
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {{ $product->stock <= 10 ? 'bg-warning text-dark' : 'bg-success' }} rounded-pill px-3">{{ $product->stock }}</span>
+                            </td>
+                            @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                                <td class="text-center pe-4">
+                                    <div class="btn-group">
+                                        <a href="{{ route('products.edit', $product->id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i></a>
+                                        <form action="{{ route('products.destroy', $product->id) }}" method="POST" onsubmit="return confirm('Hapus produk?');">
+                                            @csrf @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                        </form>
+                                    </div>
+                                </td>
+                            @endif
+                        </tr>
+                    @empty
+                        <tr><td colspan="7" class="text-center py-5 text-muted">Produk tidak ditemukan.</td></tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+
+        {{-- TAMPILAN MOBILE (CARD LIST) --}}
+        <div class="d-md-none bg-light p-2">
+            @forelse($products as $product)
+                <div class="card mb-2 border-0 shadow-sm rounded-3">
+                    <div class="card-body p-3">
+                        <div class="d-flex gap-3">
+                            {{-- FOTO DI KIRI --}}
+                            <div style="flex-shrink: 0;">
+                                @if ($product->image)
+                                    <img src="{{ asset('storage/products/' . $product->image) }}" class="rounded border" width="70" height="70" style="object-fit: cover;" data-bs-toggle="modal" data-bs-target="#imgModal{{ $product->id }}">
+                                @else
+                                    <div class="bg-light rounded border d-flex align-items-center justify-content-center text-muted" style="width: 70px; height: 70px;"><i class="bi bi-image fs-4"></i></div>
+                                @endif
+                            </div>
+
+                            {{-- DETAIL DI KANAN --}}
+                            <div class="flex-grow-1 min-width-0">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <h6 class="fw-bold text-dark mb-1 text-truncate">{{ $product->name }}</h6>
+                                    @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                                        <div class="dropdown">
+                                            <button class="btn btn-link text-muted p-0" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
+                                            <ul class="dropdown-menu dropdown-menu-end border-0 shadow">
+                                                <li><a class="dropdown-item" href="{{ route('products.edit', $product->id) }}"><i class="bi bi-pencil me-2"></i>Edit</a></li>
+                                                <li>
+                                                    <form action="{{ route('products.destroy', $product->id) }}" method="POST" onsubmit="return confirm('Hapus?');">
+                                                        @csrf @method('DELETE')
+                                                        <button class="dropdown-item text-danger"><i class="bi bi-trash me-2"></i>Hapus</button>
+                                                    </form>
+                                                </li>
+                                            </ul>
+                                        </div>
+                                    @endif
+                                </div>
+
+                                <div class="mb-1">
+                                    <span class="badge bg-light text-secondary border me-1">{{ $product->category }}</span>
+                                    <span class="badge {{ $product->stock <= 10 ? 'bg-warning text-dark' : 'bg-success' }}">{{ $product->stock }} Unit</span>
+                                </div>
+
+                                <div class="d-flex justify-content-between align-items-end mt-2">
+                                    <div>
+                                        @if ($product->discount_price > 0)
+                                            <small class="text-decoration-line-through text-muted" style="font-size: 0.7rem;">Rp {{ number_format($product->price, 0, ',', '.') }}</small>
+                                            <div class="fw-bold text-danger">Rp {{ number_format($product->discount_price, 0, ',', '.') }}</div>
+                                        @else
+                                            <div class="fw-bold text-primary">Rp {{ number_format($product->price, 0, ',', '.') }}</div>
+                                        @endif
+                                    </div>
+                                    <div class="small text-muted text-end" style="font-size: 0.7rem; line-height: 1.2;">
+                                        <i class="bi bi-geo-alt-fill text-secondary"></i>
+                                        {{ $product->lokasi_gudang ?? '-' }}<br>
+                                        {{ $product->gate ?? '' }} {{ $product->block ?? '' }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- MODAL IMAGE (MOBILE & DESKTOP) --}}
+                @if ($product->image)
+                    <div class="modal fade" id="imgModal{{ $product->id }}" tabindex="-1">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content bg-transparent border-0 shadow-none">
+                                <div class="modal-body text-center p-0">
+                                    <img src="{{ asset('storage/products/' . $product->image) }}" class="img-fluid rounded shadow" style="max-height: 80vh;">
+                                    <button type="button" class="btn btn-light rounded-circle position-absolute top-0 end-0 m-3 shadow" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            @empty
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-search fs-1 d-block mb-2 opacity-50"></i>
+                    <p>Produk tidak ditemukan.</p>
+                </div>
+            @endforelse
+        </div>
+
+        {{-- PAGINATION --}}
+        <div class="p-3 bg-white border-top">
+            {{ $products->links() }}
+        </div>
+    </div>
+
+    {{-- MODAL RESTOCK --}}
+    <div class="modal fade" id="restockModal" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <form id="restockForm" method="POST">
+                    @csrf @method('PATCH')
+                    <div class="modal-header">
+                        <h5 class="modal-title fw-bold">Update Restock</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3 text-center">
+                            <h6 class="text-muted small">PRODUK</h6>
+                            <h5 class="fw-bold text-primary" id="modalProductName">...</h5>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Estimasi Barang Masuk</label>
+                            <input type="date" name="restock_date" id="modalRestockDate" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-primary fw-bold">Simpan</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     @push('scripts')
         <script>
             function openRestockModal(id, name, date) {
-                // 1. Isi Nama Produk di Header Modal
                 document.getElementById('modalProductName').innerText = name;
-
-                // 2. Isi Tanggal
                 let dateInput = document.getElementById('modalRestockDate');
-                if (date) {
-                    dateInput.value = date.split(' ')[0];
-                } else {
-                    dateInput.value = '';
-                }
+                dateInput.value = date ? date.split(' ')[0] : '';
 
-                // 3. Update Action URL pada Form
                 let url = "{{ route('products.updateRestock', ':id') }}";
-                url = url.replace(':id', id);
-                document.getElementById('restockForm').action = url;
+                document.getElementById('restockForm').action = url.replace(':id', id);
 
-                // 4. Tampilkan Modal
-                let myModal = new bootstrap.Modal(document.getElementById('restockModal'));
-                myModal.show();
+                new bootstrap.Modal(document.getElementById('restockModal')).show();
             }
         </script>
     @endpush
+</div>
 @endsection
