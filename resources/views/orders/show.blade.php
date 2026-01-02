@@ -96,6 +96,60 @@
         </div>
     @endif
 
+    {{-- PANEL KASIR (UPLOAD SURAT JALAN) --}}
+    @if (Auth::user()->role == 'kasir' && in_array($order->status, ['approved', 'processed', 'shipped']))
+        <div class="card border-0 shadow-sm mb-4 bg-primary bg-opacity-10 d-print-none">
+            <div class="card-body p-3 p-md-4">
+                <h6 class="fw-bold text-primary mb-3">
+                    <i class="bi bi-truck me-2"></i>
+                    {{ $order->status == 'shipped' ? 'Update Pengiriman' : 'Proses Pengiriman' }}
+                </h6>
+
+                <form action="{{ route('orders.process', $order->id) }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="row g-2 align-items-end">
+                        <div class="col-12 col-md-5">
+                            <label class="small fw-bold mb-1">Upload Surat Jalan</label>
+                            <input type="file" name="delivery_proof" class="form-control form-control-sm" required>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="small fw-bold mb-1">Nama Driver</label>
+                            <input type="text" name="driver_name" class="form-control form-control-sm"
+                                value="{{ old('driver_name', $order->driver_name) }}" placeholder="Nama Supir" required>
+                            <input type="hidden" name="is_revision" value="0">
+                        </div>
+                        <div class="col-12 col-md-3">
+                            <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold mt-2 mt-md-0">
+                                <i class="bi bi-upload me-1"></i>
+                                {{ $order->status == 'shipped' ? 'Update Data' : 'Proses Jalan' }}
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    @endif
+
+    {{-- INFO ORDER DITOLAK (SALES ONLY) --}}
+    @if ($order->status == 'rejected')
+        <div class="alert alert-danger shadow-sm border-start border-5 border-danger fade show d-print-none p-3 p-md-4 mb-4" role="alert">
+            <h5 class="alert-heading fw-bold d-flex align-items-center">
+                <i class="bi bi-x-circle-fill me-2 fs-4"></i>Order Ditolak!
+            </h5>
+            <p class="mb-0">Alasan Manager: <strong>"{{ $order->rejection_note ?? 'Tidak ada alasan spesifik.' }}"</strong></p>
+
+            @if (Auth::id() == $order->user_id)
+                <hr>
+                <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2">
+                    <p class="mb-0 small text-muted">Silakan perbaiki order ini & ajukan ulang.</p>
+                    <a href="{{ route('orders.edit', $order->id) }}" class="btn btn-light text-danger fw-bold shadow-sm w-100 w-md-auto">
+                        <i class="bi bi-pencil-square me-1"></i> Edit & Ajukan Ulang
+                    </a>
+                </div>
+            @endif
+        </div>
+    @endif
+
     {{-- AREA INVOICE --}}
     <div class="card shadow-lg border-0" id="printArea">
         <div class="card-body p-4 p-md-5">
