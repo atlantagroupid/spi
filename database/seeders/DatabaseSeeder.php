@@ -18,9 +18,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             UserSeeder::class,
-            // ProductSeeder::class,
-            // CustomerSeeder::class,  // <--- Bikin 20 Toko
-            // DemoDataSeeder::class,  // <--- Isi Transaksi ke 20 Toko tsb
             SettingSeeder::class,
         ]);
     }

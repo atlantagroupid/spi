@@ -68,32 +68,32 @@ class SettingSeeder extends Seeder
             );
         }
 
-        // =========================================================
-        // 4. LOKASI GUDANG (DATA DUMMY UNTUK DEMO)
-        // =========================================================
+        // // =========================================================
+        // // 4. LOKASI GUDANG (DATA DUMMY UNTUK DEMO)
+        // // =========================================================
 
-        // A. Buat Gudang Pusat
-        $gudangPusat = Gudang::firstOrCreate(
-            ['name' => 'Gudang Pusat (Lambaro)'],
-        );
+        // // A. Buat Gudang Pusat
+        // $gudangPusat = Gudang::firstOrCreate(
+        //     ['name' => 'Gudang Pusat (Lambaro)'],
+        // );
 
-        // B. Buat Gate (Pintu/Area) di Gudang Pusat
-        // Gate 1: Area Berat (Keramik/Granit)
-        $gate1 = Gate::firstOrCreate(
-            ['name' => 'Gate A (Material Berat)', 'gudang_id' => $gudangPusat->id]
-        );
-        // Blok di Gate 1
-        Block::firstOrCreate(['name' => 'Blok A1 (Granit 60x60)', 'gate_id' => $gate1->id]);
-        Block::firstOrCreate(['name' => 'Blok A2 (Keramik Lantai)', 'gate_id' => $gate1->id]);
-        Block::firstOrCreate(['name' => 'Blok A3 (Keramik Dinding)', 'gate_id' => $gate1->id]);
+        // // B. Buat Gate (Pintu/Area) di Gudang Pusat
+        // // Gate 1: Area Berat (Keramik/Granit)
+        // $gate1 = Gate::firstOrCreate(
+        //     ['name' => 'Gate A (Material Berat)', 'gudang_id' => $gudangPusat->id]
+        // );
+        // // Blok di Gate 1
+        // Block::firstOrCreate(['name' => 'Blok A1 (Granit 60x60)', 'gate_id' => $gate1->id]);
+        // Block::firstOrCreate(['name' => 'Blok A2 (Keramik Lantai)', 'gate_id' => $gate1->id]);
+        // Block::firstOrCreate(['name' => 'Blok A3 (Keramik Dinding)', 'gate_id' => $gate1->id]);
 
-        // Gate 2: Area Interior (Vinyl/Wallpaper)
-        $gate2 = Gate::firstOrCreate(
-            ['name' => 'Gate B (Interior & Finishing)', 'gudang_id' => $gudangPusat->id]
-        );
-        // Blok di Gate 2
-        Block::firstOrCreate(['name' => 'Blok B1 (Vinyl & SPC)', 'gate_id' => $gate2->id]);
-        Block::firstOrCreate(['name' => 'Blok B2 (Wallpaper)', 'gate_id' => $gate2->id]);
-        Block::firstOrCreate(['name' => 'Blok B3 (Lem & Aksesoris)', 'gate_id' => $gate2->id]);
+        // // Gate 2: Area Interior (Vinyl/Wallpaper)
+        // $gate2 = Gate::firstOrCreate(
+        //     ['name' => 'Gate B (Interior & Finishing)', 'gudang_id' => $gudangPusat->id]
+        // );
+        // // Blok di Gate 2
+        // Block::firstOrCreate(['name' => 'Blok B1 (Vinyl & SPC)', 'gate_id' => $gate2->id]);
+        // Block::firstOrCreate(['name' => 'Blok B2 (Wallpaper)', 'gate_id' => $gate2->id]);
+        // Block::firstOrCreate(['name' => 'Blok B3 (Lem & Aksesoris)', 'gate_id' => $gate2->id]);
     }
 }

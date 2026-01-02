@@ -2,25 +2,43 @@
     document.addEventListener("DOMContentLoaded", function(event) {
         // --- LOGIC SIDEBAR TOGGLE ---
         const sidebar = document.getElementById('sidebar');
-        const content = document.getElementById('content');
         const overlay = document.getElementById('overlay');
-        const btn = document.getElementById('sidebarCollapse');
+        const btnOpen = document.getElementById('sidebarCollapse'); // Tombol di Navbar
+        const btnClose = document.getElementById('sidebarClose');   // Tombol X di Sidebar
 
+        // Fungsi Buka/Tutup
         function toggleSidebar() {
             if(sidebar) sidebar.classList.toggle('active');
             if(overlay) overlay.classList.toggle('active');
         }
 
-        if (btn) {
-            btn.addEventListener('click', toggleSidebar);
-            if(overlay) overlay.addEventListener('click', toggleSidebar);
+        // Fungsi Tutup Saja (dipakai saat klik overlay atau tombol X)
+        function closeSidebar() {
+            if(sidebar) sidebar.classList.remove('active');
+            if(overlay) overlay.classList.remove('active');
+        }
+
+        // Event Listeners
+        if (btnOpen) {
+            btnOpen.addEventListener('click', function(e) {
+                e.stopPropagation(); // Mencegah event bubbling
+                toggleSidebar();
+            });
+        }
+
+        if (btnClose) {
+            btnClose.addEventListener('click', closeSidebar);
+        }
+
+        if (overlay) {
+            overlay.addEventListener('click', closeSidebar);
         }
     });
 </script>
 
+{{-- Sisa script SweetAlert di bawahnya biarkan saja --}}
 {{-- JS SweetAlert2 Logic --}}
 <script>
-    // 1. Cek apakah ada pesan SUKSES
     @if (session('success'))
         Swal.fire({
             icon: 'success',
@@ -32,7 +50,6 @@
         });
     @endif
 
-    // 2. Cek apakah ada pesan ERROR
     @if (session('error'))
         Swal.fire({
             icon: 'error',
@@ -43,7 +60,6 @@
         });
     @endif
 
-    // 3. Konfirmasi Hapus
     function confirmDelete(event) {
         event.preventDefault();
         var form = event.target.form;
@@ -63,29 +79,23 @@
         })
     }
 </script>
+
 {{-- JS Global Confirm Submit Function --}}
 <script>
-    // FUNGSI GLOBAL KONFIRMASI (Bisa dipanggil dari mana saja)
     function confirmSubmit(event, title = 'Konfirmasi', text = 'Apakah Anda yakin ingin melanjutkan?') {
-        // 1. Cegah form agar tidak langsung submit
         event.preventDefault();
-
-        // 2. Cari elemen form terdekat dari tombol yang diklik
         const form = event.target.closest('form');
-
-        // 3. Tampilkan SweetAlert
         Swal.fire({
             title: title,
             text: text,
-            icon: 'question',         // Ikon tanda tanya
+            icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: '#0d6efd', // Warna tombol YA (Biru Primary)
-            cancelButtonColor: '#6c757d',  // Warna tombol BATAL (Abu)
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
             confirmButtonText: 'Ya, Lanjutkan!',
             cancelButtonText: 'Batal',
-            reverseButtons: true      // Tombol Batal di kiri
+            reverseButtons: true
         }).then((result) => {
-            // 4. Jika user klik "Ya", baru submit form secara manual
             if (result.isConfirmed) {
                 form.submit();
             }

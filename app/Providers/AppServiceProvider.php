@@ -9,12 +9,15 @@ use Illuminate\Support\Facades\View; // <--- Tambahkan ini
 use Illuminate\Support\Facades\Auth; // <--- Tambahkan ini
 use App\Models\Approval; // Jika Anda punya model Approval terpusat
 use App\Models\TopSubmission;
+use Illuminate\Support\Facades\URL;
 
 class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        if (config('app.env') === 'local') {
+        URL::forceScheme('https');
+    }
     }
 
     public function boot()

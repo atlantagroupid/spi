@@ -50,24 +50,33 @@
 
 <nav id="sidebar">
     {{-- 1. SIDEBAR BRAND/LOGO --}}
-    <a class="sidebar-brand d-flex align-items-center justify-content-start text-decoration-none"
-        href="{{ route('dashboard') }}">
-        <div class="sidebar-brand-icon">
-            <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center p-1"
-                style="width: 42px; height: 42px;">
-                <img src="{{ asset('images/logo.png') }}" alt="Logo" class="img-fluid"
-                    style="max-height: 28px; width: auto;"
-                    onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                <i class="bi bi-building-fill text-primary fs-5" style="display: none;"></i>
+    <div class="sidebar-brand d-flex align-items-center justify-content-between">
+        {{-- Logo & Teks --}}
+        <a class="d-flex align-items-center text-decoration-none text-white" href="{{ route('dashboard') }}">
+            <div class="sidebar-brand-icon">
+                <div class="bg-white rounded-circle shadow-sm d-flex align-items-center justify-content-center p-1"
+                    style="width: 38px; height: 38px;">
+                    <img src="{{ asset('images/logo.png') }}" alt="Logo" class="img-fluid"
+                        style="max-height: 24px; width: auto;"
+                        onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                    <i class="bi bi-building-fill text-primary fs-6" style="display: none;"></i>
+                </div>
             </div>
+            <div class="sidebar-brand-text ms-2 text-start d-flex flex-column justify-content-center">
+                <span class="text-white text-uppercase" style="font-size: 0.9rem;">
+                    {{ \App\Models\Setting::where('key', 'app_name')->value('value') ?? 'SFA BINTANG' }}
+                </span>
+                <span class="text-white-50 fst-italic" style="font-size: 0.65rem;">Interior System</span>
+            </div>
+        </a>
+
+        {{-- TOMBOL CLOSE (HANYA MUNCUL DI MOBILE) --}}
+        <div class="d-md-none">
+            <button type="button" id="sidebarClose" class="btn btn-link text-white-50 p-0">
+                <i class="bi bi-x-lg fs-5"></i>
+            </button>
         </div>
-        <div class="sidebar-brand-text ms-2 text-start d-flex flex-column justify-content-center">
-            <span class="text-white text-uppercase">
-                {{ \App\Models\Setting::where('key', 'app_name')->value('value') ?? 'SFA BINTANG' }}
-            </span>
-            <span class="text-white-50 fst-italic">Interior System</span>
-        </div>
-    </a>
+    </div>
 
     {{-- 2. SIDEBAR NAVIGATION --}}
     <ul class="list-unstyled components">
