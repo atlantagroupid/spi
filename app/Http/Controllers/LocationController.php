@@ -26,12 +26,18 @@ class LocationController extends Controller
      */
     public function storeGudang(Request $request)
     {
-        $request->validate(['name' => 'required|string|max:255|unique:gudangs,name'], [
-            'name.unique' => 'Nama gudang ini sudah ada.'
-        ]);
+        $messages = [
+            'name.required' => 'Nama gudang wajib diisi.',
+            'name.unique'   => 'Nama gudang ini sudah ada di sistem.',
+        ];
+
+        $request->validate([
+            'name' => 'required|string|max:255|unique:gudangs,name'
+        ], $messages);
 
         Gudang::create($request->all());
-        return back()->with('success', 'Gudang baru berhasil dibuat.');
+
+        return back()->with('success', 'Gudang baru berhasil ditambahkan.');
     }
 
     /**
@@ -43,8 +49,8 @@ class LocationController extends Controller
             Gudang::findOrFail($id)->delete();
             return back()->with('success', 'Gudang berhasil dihapus.');
         } catch (\Exception $e) {
-            // Biasanya gagal karena masih ada produk di dalamnya (Foreign Key)
-            return back()->with('error', 'Gagal hapus! Kemungkinan masih ada produk atau gate di gudang ini.');
+            // Error ini biasanya karena Foreign Key Constraint (Gudang masih dipakai di Gate/Produk)
+            return back()->with('error', 'Gagal menghapus gudang. Pastikan gudang ini sudah kosong (tidak ada Gate atau Produk yang terdaftar di sini).');
         }
     }
 
@@ -53,14 +59,18 @@ class LocationController extends Controller
      */
     public function storeGate(Request $request)
     {
+        $messages = [
+            'gudang_id.required' => 'Pilih gudang terlebih dahulu.',
+            'name.required'      => 'Nama Gate/Lorong wajib diisi.',
+        ];
+
         $request->validate([
             'gudang_id' => 'required|exists:gudangs,id',
-            'name' => 'required|string|max:255',
-        ], [
-            'gudang_id.required' => 'Pilih gudang terlebih dahulu.',
-        ]);
+            'name'      => 'required|string|max:255',
+        ], $messages);
 
         Gate::create($request->all());
+
         return back()->with('success', 'Gate/Lorong berhasil ditambahkan.');
     }
 
@@ -73,8 +83,7 @@ class LocationController extends Controller
             Gate::findOrFail($id)->delete();
             return back()->with('success', 'Gate berhasil dihapus.');
         } catch (\Exception $e) {
-            // Biasanya gagal karena masih ada produk di dalamnya (Foreign Key)
-            return back()->with('error', 'Gagal hapus! Kemungkinan masih ada produk atau gate di Gate ini.');
+            return back()->with('error', 'Gagal menghapus Gate. Pastikan tidak ada Block/Rak yang terdaftar di Gate ini.');
         }
     }
 
@@ -83,12 +92,21 @@ class LocationController extends Controller
      */
     public function storeBlock(Request $request)
     {
+        $messages = [
+            'gate_id.required' => 'Pilih Gate/Lorong terlebih dahulu.',
+            'name.required'    => 'Nama Block/Rak wajib diisi.',
+            'name.unique'      => 'Nama Block ini sudah ada di Gate tersebut.',
+        ];
+
         $request->validate([
             'gate_id' => 'required|exists:gates,id',
+            // Validasi unik: Nama block harus unik DI DALAM Gate yang sama
             'name' => 'required|string|max:255|unique:blocks,name,NULL,id,gate_id,' . $request->gate_id,
-        ]);
+        ], $messages);
+
         Block::create($request->all());
-        return back()->with('success', 'Block berhasil ditambahkan.');
+
+        return back()->with('success', 'Block/Rak berhasil ditambahkan.');
     }
 
     /**
@@ -100,8 +118,7 @@ class LocationController extends Controller
             Block::findOrFail($id)->delete();
             return back()->with('success', 'Block berhasil dihapus.');
         } catch (\Exception $e) {
-            // Biasanya gagal karena masih ada produk di dalamnya (Foreign Key)
-            return back()->with('error', 'Gagal hapus! Kemungkinan masih ada produk atau gate di gudang ini.');
+            return back()->with('error', 'Gagal menghapus Block. Pastikan tidak ada Produk yang tersimpan di Block ini.');
         }
     }
 
