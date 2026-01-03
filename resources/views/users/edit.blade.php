@@ -31,17 +31,19 @@
                     </div>
 
                     <div class="mb-3">
-                                <label for="role" class="form-label">Role / Jabatan</label>
-                                <select name="role" id="role" class="form-select" required>
-                                    <option value="" disabled selected>-- Pilih Jabatan --</option>
+                        <label for="roleSelect" class="form-label">Role / Jabatan</label> {{-- ID diubah jadi roleSelect biar cocok sama script bawah --}}
+                        <select name="role" id="roleSelect" class="form-select" required onchange="toggleKPI()">
+                            <option value="" disabled>-- Pilih Jabatan --</option>
 
-                                    {{-- Looping Role dari Controller --}}
-                                    @foreach ($roles as $key => $label)
-                                        <option value="{{ $key }}">{{ $label }}</option>
-                                    @endforeach
+                            {{-- Looping Role dari Controller --}}
+                            @foreach ($roles as $key => $label)
+                                <option value="{{ $key }}" {{ old('role', $user->role) == $key ? 'selected' : '' }}>
+                                    {{ $label }}
+                                </option>
+                            @endforeach
 
-                                </select>
-                            </div>
+                        </select>
+                    </div>
 
                     <div id="kpi-section" style="display: none;">
                         <hr class="my-4 border-secondary opacity-25">
@@ -107,8 +109,6 @@
             kpiSection.style.display = 'block';
         } else {
             kpiSection.style.display = 'none';
-            // Opsional: Reset nilai target jadi 0 kalau bukan sales?
-            // document.getElementsByName('sales_target')[0].value = 0;
         }
     }
 

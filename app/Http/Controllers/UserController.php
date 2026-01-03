@@ -10,45 +10,26 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
-    // 1. Tampilkan Daftar User
     public function index()
     {
-        // Ambil semua user, urutkan dari yang terbaru
         $users = User::latest()->paginate(10);
         return view('users.index', compact('users'));
     }
 
-    // 2. Form Tambah User Baru
     public function create()
     {
-        // 1. Daftar Lengkap Semua Role di Sistem Anda
-        $roles = [
-            'manager_bisnis'      => 'Manager Bisnis',
-            'manager_operasional' => 'Manager Operasional',
-            'kepala_gudang'       => 'Kepala Gudang',
-            'admin_gudang'        => 'Admin Gudang',
-            'purchase'            => 'Purchase (Pembelian)',
-            'finance'             => 'Finance (Keuangan)',
-            'sales_store'         => 'Sales Toko',
-            'sales_field'         => 'Sales Lapangan',
-        ];
-
-        // 2. Filter: Hapus 'manager_operasional' dari daftar
-        unset($roles['manager_operasional']);
-
-        // 3. Kirim ke View
+        $roles = $this->getRolesList(); // Saya buat fungsi helper di bawah biar rapi
         return view('users.create', compact('roles'));
     }
 
-    // 3. Simpan User Baru
     public function store(Request $request)
     {
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'role' => 'required|in:admin,manager,sales',
-            'daily_visit_target' => 'nullable|integer|min:0', // Target visit opsional
+            'role' => 'required|string',
+            'daily_visit_target' => 'nullable|integer|min:0',
         ]);
 
         User::create([
@@ -57,84 +38,91 @@ class UserController extends Controller
             'phone' => $request->phone,
             'password' => Hash::make($request->password),
             'role' => $request->role,
-            // Jika kosong, default 0
             'daily_visit_target' => $request->daily_visit_target ?? 0,
         ]);
 
         return redirect()->route('users.index')->with('success', 'User berhasil ditambahkan!');
     }
 
-    // 4. Form Edit User
+    // --- PERBAIKAN DI SINI ---
     public function edit(User $user)
     {
-        return view('users.edit', compact('user'));
+        // Kita panggil daftar role agar variabel $roles tersedia di view
+        $roles = $this->getRolesList();
+
+        // Kirim $user DAN $roles ke view
+        return view('users.edit', compact('user', 'roles'));
     }
 
     public function update(Request $request, User $user)
     {
-        // 1. Validasi Input
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => ['required', 'email', \Illuminate\Validation\Rule::unique('users')->ignore($user->id)],
-            'role' => 'required|string', // Kita izinkan string agar fleksibel dengan role baru
-            'sales_target' => 'nullable|numeric|min:0',      // Validasi Target Omset
-            'daily_visit_target' => 'nullable|integer|min:0', // Validasi Target Visit
+            'role' => 'required|string',
+            'sales_target' => 'nullable|numeric|min:0',
+            'daily_visit_target' => 'nullable|integer|min:0',
         ]);
 
-        // 2. Siapkan Data
         $data = [
             'name' => $request->name,
             'email' => $request->email,
-            'phone' => $request->phone, // Pastikan kolom 'phone' ada di $fillable User model
+            'phone' => $request->phone,
             'role' => $request->role,
-
-            // Simpan Target KPI (Pakai operator ?? 0 untuk default)
             'sales_target' => $request->sales_target ?? 0,
             'daily_visit_target' => $request->daily_visit_target ?? 5,
         ];
 
-        // 3. Cek Password (Hanya update jika diisi)
         if ($request->filled('password')) {
             $data['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
         }
 
-        // 4. Eksekusi Update
         $user->update($data);
 
-        return redirect()->route('users.index')->with('success', 'Data user & Target KPI berhasil diperbarui!');
+        return redirect()->route('users.index')->with('success', 'Data user berhasil diperbarui!');
     }
 
-    // 6. Hapus User
     public function destroy(User $user)
     {
-        // Cegah admin menghapus dirinya sendiri saat login
         if (Auth::id() == $user->id) {
             return back()->with('error', 'Anda tidak bisa menghapus akun sendiri!');
         }
-
         $user->delete();
         return redirect()->route('users.index')->with('success', 'User berhasil dihapus.');
     }
 
     public function updateSalesTarget(Request $request)
     {
-        // 1. Validasi: Pastikan yang akses adalah Manager
         if (!in_array(Auth::user()->role, ['manager_bisnis', 'manager_operasional'])) {
             abort(403, 'Anda tidak memiliki akses.');
         }
-
-        // 2. Validasi Input
         $request->validate([
             'user_id' => 'required|exists:users,id',
             'target'  => 'required|numeric|min:0'
         ]);
-
-        // 3. Update Target
         $sales = \App\Models\User::findOrFail($request->user_id);
-        $sales->update([
-            'sales_target' => $request->target
-        ]);
+        $sales->update(['sales_target' => $request->target]);
+        return back()->with('success', 'Target omset berhasil diperbarui!');
+    }
 
-        return back()->with('success', 'Target omset untuk ' . $sales->name . ' berhasil diperbarui!');
+    // --- HELPER FUNCTION BIAR TIDAK DUPLIKAT KODE ---
+    private function getRolesList()
+    {
+        $roles = [
+            'manager_bisnis'      => 'Manager Bisnis',
+            'manager_operasional' => 'Manager Operasional',
+            'kepala_gudang'       => 'Kepala Gudang',
+            'admin_gudang'        => 'Admin Gudang',
+            'purchase'            => 'Purchase (Pembelian)',
+            'finance'             => 'Finance (Keuangan)',
+            'kasir'               => 'Kasir', // Saya tambahkan Kasir karena ada di file lain
+            'sales_store'         => 'Sales Toko',
+            'sales_field'         => 'Sales Lapangan',
+        ];
+
+        // Opsional: Sembunyikan Manager Operasional dari dropdown jika bukan Super Admin
+        // unset($roles['manager_operasional']);
+
+        return $roles;
     }
 }
