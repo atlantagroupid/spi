@@ -23,7 +23,6 @@
                 <div class="card-body p-4">
                     <form action="{{ route('profile.update') }}" method="POST" enctype="multipart/form-data">
                         @csrf
-                        @method('PATCH')
 
                         {{-- FOTO PROFIL DENGAN TOMBOL OVERLAY --}}
                         <div class="d-flex flex-column align-items-center mb-4">

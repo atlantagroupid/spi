@@ -99,15 +99,19 @@ class TopSubmissionController extends Controller
     public function index()
     {
         // Tampilkan semua pengajuan, urutkan dari yang terbaru
-        $submissions = TopSubmission::with(['sales', 'customer'])->latest()->get();
-        return view('top_submissions.index', compact('submissions'));
+        $submissions = \App\Models\TopSubmission::with(['user', 'customer'])
+        ->where('status', 'pending')
+        ->latest()
+        ->paginate(10);
+
+    return view('top_submissions.index', compact('submissions'));
     }
 
     // UPDATE LOGIC APPROVE (PENTING!)
     public function approve($id)
     {
         $submission = \App\Models\TopSubmission::findOrFail($id);
-        $salesUser = $submission->sales;
+        $salesUser = $submission->user;
         $customer = $submission->customer;
 
         if ($submission->status !== 'pending') {

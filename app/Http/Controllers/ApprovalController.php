@@ -98,7 +98,6 @@ class ApprovalController extends Controller
                 \App\Models\Product::create($approval->new_data);
             }
             // [TAMBAHAN BARU] 2.1. APPROVE CUSTOMER BARU
-            // Karena data customer sudah ada (status: pending), kita tinggal ubah jadi active
             elseif ($action == 'create' && $approval->model_type == \App\Models\Customer::class) {
                 if ($realData) {
                     $realData->update(['status' => 'active']);
@@ -112,18 +111,17 @@ class ApprovalController extends Controller
             }
 
             // ======================================================
-            // 4. APPROVE ORDER
+            // 4. APPROVE ORDER (PERBAIKAN UTAMA DISINI)
             // ======================================================
             elseif ($action === 'approve_order') {
                 $order = \App\Models\Order::find($approval->model_id);
                 if ($order) {
                     $order->update(['status' => 'approved']);
 
-                    // Potong Limit Customer jika TOP/Kredit
+                    // [PERBAIKAN] Gunakan 'debt' bukan 'credit_limit_quota'
                     if (in_array($order->payment_type, ['top', 'kredit']) && $order->customer) {
-                        // Pastikan kolom di DB customer bernama 'credit_limit' atau 'credit_limit_quota'
-                        // Sesuaikan dengan nama kolom Anda (misal: limit_quota)
-                        $order->customer->decrement('credit_limit_quota', $order->total_price);
+                        // Hutang Bertambah (Limit Terpakai)
+                        $order->customer->decrement('credit_limit', $order->total_price);
                     }
 
                     // [PENTING] Catat History Order
@@ -132,7 +130,7 @@ class ApprovalController extends Controller
             }
 
             // ======================================================
-            // 5. APPROVE PEMBAYARAN (PAYMENT LOG)
+            // 5. APPROVE PEMBAYARAN (PERBAIKAN UTAMA DISINI)
             // ======================================================
             elseif ($action === 'approve_payment') {
                 $log = \App\Models\PaymentLog::find($approval->model_id);
@@ -153,9 +151,9 @@ class ApprovalController extends Controller
                             $this->recordOrderHistory($order, 'Bayar Partial', 'Pembayaran sebagian diterima.');
                         }
 
-                        // Kembalikan Limit Customer (Top Up Limit)
+                        // [PERBAIKAN] Hutang Berkurang (Limit Kembali)
                         if (in_array($order->payment_type, ['top', 'kredit']) && $order->customer) {
-                            $order->customer->increment('credit_limit_quota', $log->amount);
+                            $order->customer->decrement('debt', $log->amount);
                         }
                     }
                 }
@@ -168,7 +166,7 @@ class ApprovalController extends Controller
                 $order = \App\Models\Order::find($approval->model_id);
                 if ($order) {
                     $order->update([
-                        'delivery_proof' => $approval->new_data['delivery_proof'], // Pastikan key array sama
+                        'delivery_proof' => $approval->new_data['delivery_proof'],
                         'driver_name'    => $approval->new_data['driver_name'] ?? $order->driver_name,
                         'status'         => 'shipped'
                     ]);
@@ -252,23 +250,15 @@ class ApprovalController extends Controller
 
     public function show_detail($id)
     {
-        // 1. Ambil data approval beserta relasinya
-        // 'approveable' adalah fitur Laravel MorphTo yang otomatis mengambil model aslinya (Customer/Order/dll)
         $approval = \App\Models\Approval::with(['requester', 'approveable'])->findOrFail($id);
 
-        // 2. LOGIKA PERBAIKAN (FALLBACK DATA)
-        // Ambil dari kolom JSON 'data' di tabel approvals
         $dataContent = $approval->data;
-
-        // JIKA kolom JSON kosong (kasus "null" kemarin), ambil dari data asli (tabel customers)
         if (empty($dataContent) && $approval->approveable) {
             $dataContent = $approval->approveable->toArray();
         }
 
-        // 3. Kembalikan ke View Partial
         return view('approvals.partials._detail_content', [
             'approval' => $approval,
-            // Kita kirim variable $dataContent yang sudah pasti terisi
             'data'     => $dataContent
         ]);
     }
@@ -281,7 +271,7 @@ class ApprovalController extends Controller
     {
         $user = Auth::user();
         $search = $request->search;
-        $date = $request->date; // <--- AMBIL TANGGAL DARI INPUT
+        $date = $request->date;
 
         // 1. Query Approval Lama
         $appQuery = Approval::with(['requester', 'approver', 'approveable'])
@@ -289,7 +279,6 @@ class ApprovalController extends Controller
 
         $this->applyHistoryFilter($appQuery, $user, $search);
 
-        // FILTER TANGGAL (APPROVAL)
         if ($date) {
             $appQuery->whereDate('updated_at', $date);
         }
@@ -307,7 +296,6 @@ class ApprovalController extends Controller
 
             if ($search) $topQuery->whereHas('sales', fn($q) => $q->where('name', 'like', "%$search%"));
 
-            // FILTER TANGGAL (TOP)
             if ($date) {
                 $topQuery->whereDate('updated_at', $date);
             }
@@ -321,7 +309,6 @@ class ApprovalController extends Controller
         // 3. Merge & Paginate
         $merged = $approvals->merge($topSubmissions)->sortByDesc('updated_at')->values();
 
-        // Pagination Logic
         $page = Paginator::resolveCurrentPage() ?: 1;
         $perPage = 10;
         $histories = new LengthAwarePaginator(
@@ -339,15 +326,13 @@ class ApprovalController extends Controller
     {
         $user = Auth::user();
         $search = $request->search;
-        $date = $request->date; // <--- AMBIL TANGGAL
+        $date = $request->date;
 
-        // 1. AMBIL APPROVAL BIASA
         $appQuery = Approval::with(['requester', 'approver', 'approveable'])
             ->whereIn('status', ['approved', 'rejected']);
 
         $this->applyHistoryFilter($appQuery, $user, $search);
 
-        // FILTER TANGGAL PDF
         if ($date) {
             $appQuery->whereDate('updated_at', $date);
         }
@@ -357,7 +342,6 @@ class ApprovalController extends Controller
             return $item;
         });
 
-        // 2. AMBIL TOP SUBMISSION
         $topSubmissions = collect();
         if (in_array($user->role, ['manager_bisnis', 'manager_operasional'])) {
             $topQuery = TopSubmission::with(['sales', 'customer', 'approver'])
@@ -365,7 +349,6 @@ class ApprovalController extends Controller
 
             if ($search) $topQuery->whereHas('sales', fn($q) => $q->where('name', 'like', "%$search%"));
 
-            // FILTER TANGGAL PDF
             if ($date) {
                 $topQuery->whereDate('updated_at', $date);
             }
@@ -376,18 +359,17 @@ class ApprovalController extends Controller
             });
         }
 
-        // 3. GABUNGKAN
         $histories = $approvals->merge($topSubmissions)->sortByDesc('updated_at')->values();
 
         $pdf = Pdf::loadView('approvals.pdf_history', compact('histories', 'user'))
             ->setPaper('a4', 'landscape');
 
-        // Nama file ada tanggalnya jika difilter
         $filename = 'Laporan-Riwayat-' . ($date ?? 'Semua') . '.pdf';
         return $pdf->download($filename);
     }
+
     // =========================================================================
-    // 4. PRIVATE HELPERS (Untuk mengurangi duplikasi kode)
+    // 4. PRIVATE HELPERS
     // =========================================================================
 
     private function authorizeRole($roles)
@@ -405,7 +387,6 @@ class ApprovalController extends Controller
 
     private function applyHistoryFilter($query, $user, $search)
     {
-        // Filter Role
         if ($user->role === 'kepala_gudang') {
             $query->where('model_type', 'like', '%Product%');
         } elseif ($user->role === 'manager_bisnis') {
@@ -415,7 +396,6 @@ class ApprovalController extends Controller
                     ->orWhere('model_type', 'like', '%PaymentLog%');
             });
         }
-        // Filter Search
         if ($search) {
             $query->whereHas('requester', fn($q) => $q->where('name', 'like', "%$search%"));
         }

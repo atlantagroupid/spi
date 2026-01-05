@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 
 class Order extends Model
 {
+    use HasFactory;
+
     protected $guarded = ['id']; // Semua boleh diisi kecuali ID
 
     protected $fillable = [
@@ -20,7 +23,7 @@ class Order extends Model
         'notes',
         'payment_type',
         'rejection_note',
-        'delivery_proof', 
+        'delivery_proof',
         'driver_name',
     ];
 

@@ -70,6 +70,9 @@
         <form action="{{ route('orders.store') }}" method="POST" enctype="multipart/form-data" id="orderForm">
             @csrf
 
+            {{-- [PERBAIKAN] NAMA INPUT DIGANTI JADI 'top_days' AGAR SESUAI CONTROLLER --}}
+            <input type="hidden" name="top_days" id="hidden_top_days" value="">
+
             <div class="row g-4">
 
                 {{-- KOLOM KIRI: INFO PELANGGAN (Urutan Pertama) --}}
@@ -250,6 +253,10 @@
                 topSection.style.display = 'block';
                 var days = parseInt(paymentSelect.getAttribute('data-current-days')) || 0;
                 var limit = parseFloat(paymentSelect.getAttribute('data-current-limit')) || 0;
+
+                // [PERBAIKAN] Mengisi nilai input 'top_days'
+                document.getElementById('hidden_top_days').value = days;
+
                 document.getElementById('display_days').innerText = days + " Hari";
                 document.getElementById('display_limit').innerText = "Rp " + new Intl.NumberFormat('id-ID').format(limit);
 
@@ -259,6 +266,9 @@
                 document.getElementById('display_due_date').innerText = dueDate.toLocaleDateString('id-ID', options);
             } else {
                 topSection.style.display = 'none';
+
+                // [PERBAIKAN] Kosongkan 'top_days' jika bukan TOP
+                document.getElementById('hidden_top_days').value = '';
             }
         }
 

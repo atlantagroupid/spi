@@ -71,8 +71,10 @@
                         <i class="bi bi-wallet2 me-2 text-primary"></i> Input Pembayaran
                     </div>
                     <div class="card-body p-4">
+                        {{-- PERBAIKAN: Hapus @method('PUT'), gunakan default POST --}}
                         <form action="{{ route('receivables.store', $order->id) }}" method="POST" enctype="multipart/form-data">
-                            @csrf @method('PUT')
+                            @csrf
+
                             <input type="hidden" name="order_id" value="{{ $order->id }}">
 
                             <div class="mb-3">

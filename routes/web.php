@@ -45,7 +45,7 @@ Route::middleware('auth')->group(function () {
 
     // --- B. PROFILE & NOTIFIKASI ---
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::match(['patch', 'post'], '/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::put('/profile/password', [ProfileController::class, 'updatePassword'])->name('profile.password');
 
     Route::get('/notifications/read', function () {
@@ -160,8 +160,10 @@ Route::middleware('auth')->group(function () {
             Route::get('/print-pdf', 'printPdf')->name('printPdf');
             Route::get('/{id}', 'show')->name('show');
             Route::post('/remind', 'sendReminders')->name('remind');
-            Route::put('/{id}/pay', 'store')->name('pay'); // Payment submission
         });
+
+        // Payment submission
+        Route::post('/receivables/{id}/pay', 'store')->name('receivables.store');
 
         // Payment Log Approval (Legacy/Backup)
         Route::prefix('payment-logs')->name('payments.')->group(function () {
@@ -189,8 +191,11 @@ Route::middleware('auth')->group(function () {
         // Actions & Details
         Route::get('/{id}/detail', 'show_detail')->name('detail');
 
-        Route::put('/{approval}/approve', 'approve')->name('approve');
-        Route::put('/{approval}/reject', 'reject')->name('reject');
+        // Rate limiting untuk mencegah approval spam (maksimal 10 request per menit)
+        Route::middleware(['throttle:10,1'])->group(function () {
+            Route::put('/{approval}/approve', 'approve')->name('approve');
+            Route::put('/{approval}/reject', 'reject')->name('reject');
+        });
     });
 
     // --- I. REPORTING ---

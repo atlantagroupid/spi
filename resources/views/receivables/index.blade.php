@@ -177,7 +177,6 @@
             <div class="modal-content border-0 shadow">
                 <form id="paymentForm" action="" method="POST" enctype="multipart/form-data">
                     @csrf
-                    @method('PUT')
                     <input type="hidden" name="order_id" id="hiddenOrderId">
                     <div class="modal-header bg-success text-white">
                         <h5 class="modal-title fw-bold">Input Pembayaran</h5>
@@ -252,7 +251,7 @@
                     if (hiddenInput) hiddenInput.value = id;
 
                     var form = paymentModal.querySelector('#paymentForm');
-                    var baseUrl = "{{ route('receivables.pay', ['id' => ':id']) }}";
+                    var baseUrl = "{{ route('receivables.store', ['id' => ':id']) }}";
                     form.action = baseUrl.replace(':id', id);
                 });
             }

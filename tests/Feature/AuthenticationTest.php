@@ -46,7 +46,7 @@ class AuthenticationTest extends TestCase
 
         $this->assertGuest();
     }
-    
+
     #[Test]
     public function authenticated_user_is_redirected_from_login_page(): void
     {
@@ -65,14 +65,14 @@ class AuthenticationTest extends TestCase
         $response = $this->actingAs($user)->post('/logout');
 
         $this->assertGuest();
-        $response->assertRedirect('/');
+        $response->assertRedirect('/login'); // Correct redirect after logout
     }
 
     #[Test]
     public function unauthenticated_users_cannot_access_dashboard(): void
     {
         $response = $this->get('/dashboard');
-        
+
         $response->assertRedirect('/login');
     }
 }

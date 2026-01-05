@@ -4,31 +4,25 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\User;     // <--- WAJIB ADA
+use App\Models\Customer; // <--- WAJIB ADA
 
 class TopSubmission extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'sales_id',
-        'customer_id',
-        'submission_limit',
-        'submission_days',
-        'status',      // pending, approved, rejected
-        'approved_by',
-        'notes',
-    ];
+    protected $guarded = ['id'];
 
-    // Relasi ke Sales yang mengajukan
-    public function sales()
+    // 1. Relasi ke User (Sales yang mengajukan)
+    public function user()
     {
-        return $this->belongsTo(User::class, 'sales_id');
+        return $this->belongsTo(User::class, 'sales_id', 'id');
     }
 
-    // Relasi ke Customer
+    // 2. Relasi ke Customer (Toko yang diajukan)
     public function customer()
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Customer::class, 'customer_id');
     }
 
     // Relasi ke Manager yang menyetujui

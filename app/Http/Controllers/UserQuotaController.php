@@ -96,50 +96,66 @@ class UserQuotaController extends Controller
     public function approve(Request $request, $id)
     {
         /** @var User $manager */
-        $manager = Auth::user()->fresh();
+        $manager = Auth::user()->fresh(); // Ambil data terbaru (termasuk sisa kuota saat ini)
         $quotaReq = QuotaRequest::with('user')->findOrFail($id);
         $amount = $quotaReq->amount;
 
+        // 1. Validasi Role: Hanya Manager yang boleh approve
         if (!in_array($manager->role, ['manager_operasional', 'manager_bisnis'])) {
-            abort(403);
+            abort(403, 'Anda tidak memiliki hak akses.');
         }
 
+        // 2. Fitur Reject (Tolak Pengajuan)
         if ($request->action == 'reject') {
-            $quotaReq->update(['status' => 'rejected', 'approver_id' => $manager->id]);
-            return back()->with('success', 'Pengajuan ditolak.');
+            $quotaReq->update([
+                'status' => 'rejected',
+                'approver_id' => $manager->id
+            ]);
+            return back()->with('success', 'Pengajuan limit ditolak.');
         }
 
+        // 3. LOGIKA TRANSFER LIMIT BERTINGKAT
         DB::beginTransaction();
         try {
-            // Cek Saldo Manager Bisnis
-            if ($manager->role == 'manager_bisnis') {
-                if ($manager->credit_limit_quota < $amount) {
-                    $sisaMgr = number_format($manager->credit_limit_quota, 0, ',', '.');
-                    // Pesan Error Spesifik
-                    return back()->with('error', "Saldo Limit Pribadi Anda tidak cukup (Sisa: Rp $sisaMgr). Silakan ajukan tambahan ke Manager Operasional dulu.");
+            // A. Cek Saldo Pengirim (Approver)
+            // Siapapun yang approve (Ops/Bisnis), harus punya modal dulu.
+            if ($manager->credit_limit_quota < $amount) {
+
+                $sisaSaldo = number_format($manager->credit_limit_quota, 0, ',', '.');
+
+                // Pesan Error yang berbeda tergantung siapa yang approve
+                if ($manager->role == 'manager_operasional') {
+                    $pesanError = "Gagal! Budget Kuota Utama (Pusat) tidak mencukupi. Sisa: Rp $sisaSaldo. Harap hubungi IT/Database Admin untuk top-up modal perusahaan.";
+                } else {
+                    $pesanError = "Gagal! Saldo Limit Anda tidak cukup (Sisa: Rp $sisaSaldo). Silakan ajukan penambahan limit ke Manager Operasional.";
                 }
-                $manager->credit_limit_quota -= $amount;
-                $manager->save();
+
+                return back()->with('error', $pesanError);
             }
 
+            // B. Eksekusi Transfer
+            // 1. Kurangi Saldo Atasan (Pemberi)
+            $manager->decrement('credit_limit_quota', $amount);
+
+            // 2. Tambah Saldo Bawahan (Penerima)
             $quotaReq->user->increment('credit_limit_quota', $amount);
 
+            // 3. Update Status Tiket
             $quotaReq->update([
                 'status' => 'approved',
                 'approver_id' => $manager->id
             ]);
 
             DB::commit();
-            return back()->with('success', 'Limit berhasil ditransfer ke bawahan. ✅');
+            return back()->with('success', 'Limit berhasil disetujui! Saldo Anda berkurang sebesar Rp ' . number_format($amount, 0, ',', '.'));
 
         } catch (\Exception $e) {
             DB::rollBack();
-            // Log error asli
             \Illuminate\Support\Facades\Log::error("Quota Approve Error: " . $e->getMessage());
-            return back()->with('error', 'Terjadi kesalahan sistem saat transfer limit.');
+            return back()->with('error', 'Terjadi kesalahan sistem saat memproses limit.');
         }
     }
-
+    
     public function updateManual(Request $request, $id)
     {
         if (Auth::user()->role !== 'manager_operasional') abort(403);

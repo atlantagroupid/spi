@@ -146,6 +146,20 @@ class OrderController extends Controller
             'quantity.*'    => 'integer|min:1',
         ], $messages);
 
+        // PRE-VALIDATION: Check stock availability before transaction
+        if ($request->has('product_id')) {
+            $countItems = count($request->product_id);
+            for ($i = 0; $i < $countItems; $i++) {
+                $prodId = $request->product_id[$i];
+                $qty = $request->quantity[$i];
+
+                $product = Product::find($prodId);
+                if (!$product || $product->stock < $qty) {
+                    return back()->withErrors(['quantity' => 'Stok untuk salah satu produk tidak mencukupi.'])->withInput();
+                }
+            }
+        }
+
         DB::beginTransaction();
         try {
             $customer = Customer::findOrFail($request->customer_id);
@@ -179,27 +193,31 @@ class OrderController extends Controller
                     $prodId = $request->product_id[$i];
                     $qty    = $request->quantity[$i];
 
+                    // Lock product row to prevent race condition
                     $product = Product::where('id', $prodId)->lockForUpdate()->first();
 
-                    if ($product) {
-                        if ($product->stock < $qty) {
-                            // Ganti Exception standar dengan pesan yang jelas
-                            throw new \Exception("Stok untuk produk '{$product->name}' tidak cukup. Sisa stok hanya: {$product->stock} unit.");
-                        }
-
-                        $product->decrement('stock', $qty);
-
-                        $finalPrice = ($product->discount_price > 0) ? $product->discount_price : $product->price;
-                        $subtotal = $finalPrice * $qty;
-                        $calculatedTotal += $subtotal;
-
-                        OrderItem::create([
-                            'order_id'   => $order->id,
-                            'product_id' => $product->id,
-                            'quantity'   => $qty,
-                            'price'      => $finalPrice,
-                        ]);
+                    if (!$product) {
+                        throw new \Exception("Produk dengan ID {$prodId} tidak ditemukan.");
                     }
+
+                    // Double-check stock after lock to ensure atomicity
+                    if ($product->stock < $qty) {
+                        throw new \Exception("Stok untuk produk '{$product->name}' tidak cukup. Sisa stok hanya: {$product->stock} unit.");
+                    }
+
+                    // Atomically decrement stock
+                    $product->decrement('stock', $qty);
+
+                    $finalPrice = ($product->discount_price > 0) ? $product->discount_price : $product->price;
+                    $subtotal = $finalPrice * $qty;
+                    $calculatedTotal += $subtotal;
+
+                    OrderItem::create([
+                        'order_id'   => $order->id,
+                        'product_id' => $product->id,
+                        'quantity'   => $qty,
+                        'price'      => $finalPrice,
+                    ]);
                 }
             }
 
@@ -232,6 +250,12 @@ class OrderController extends Controller
     // =========================================================================
     public function show(Order $order)
     {
+        // IDOR Protection: Sales hanya bisa lihat order miliknya sendiri
+        $user = Auth::user();
+        if (in_array($user->role, ['sales_field', 'sales_store']) && $order->user_id != $user->id) {
+            abort(403, 'Unauthorized action.');
+        }
+
         $order->load(['customer', 'items.product', 'paymentLogs', 'histories.user', 'latestApproval']);
         $approval = $order->latestApproval;
 

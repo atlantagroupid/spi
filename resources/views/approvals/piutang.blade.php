@@ -77,7 +77,7 @@
     </div>
 
     {{-- MODAL PIUTANG --}}
-    <div class="modal fade" id="modalReview" tabindex="-1" aria-hidden="true">
+    <div class="modal fade" id="modalReview" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content border-0 shadow-lg">
                 {{-- Header Tanpa Tombol X --}}
@@ -110,69 +110,84 @@
 
 @push('scripts')
     <script>
-        // SCRIPT MANUAL UNTUK TOMBOL TUTUP (Jaga-jaga jika atribut data-dismiss gagal)
-        $('#btnCloseModal').on('click', function() {
-            $('#modalReview').modal('hide');
-        });
-        $(document).on('click', '.btn-review', function() {
-            let id = $(this).data('id');
-            let urlDetail = "{{ route('approvals.detail', 0) }}".replace('/0', '/' + id);
-            let urlApprove = "{{ route('approvals.approve', 0) }}".replace('/0', '/' + id);
-            let urlReject = "{{ route('approvals.reject', 0) }}".replace('/0', '/' + id);
+        $(document).ready(function() {
 
-            $('#formApprove').attr('action', urlApprove);
-            $('#formReject').attr('action', urlReject);
+            // --- Script Tombol Tutup Manual ---
+            $('#btnCloseModal').on('click', function() {
+                $('#modalReview').modal('hide');
+            });
 
-            $('#modalContent').html(
-                '<div class="text-center py-5"><div class="spinner-border text-success"></div><p>Loading...</p></div>'
+            // --- Script Buka Modal Review ---
+            $(document).on('click', '.btn-review', function() {
+                let id = $(this).data('id');
+                // URL Replace Logic
+                let urlDetail = "{{ route('approvals.detail', 0) }}".replace('/0', '/' + id);
+                let urlApprove = "{{ route('approvals.approve', 0) }}".replace('/0', '/' + id);
+                let urlReject = "{{ route('approvals.reject', 0) }}".replace('/0', '/' + id);
+
+                $('#formApprove').attr('action', urlApprove);
+                $('#formReject').attr('action', urlReject);
+
+                $('#modalContent').html(
+                    '<div class="text-center py-5"><div class="spinner-border text-success"></div><p>Loading...</p></div>'
                 );
-            $('#modalReview').modal('show');
 
-            $.get(urlDetail, function(data) {
+                // Saat modal dibuka, pastikan kita bisa mematikan focus trap nanti
+                $('#modalReview').modal('show');
+
+                $.get(urlDetail, function(data) {
                     $('#modalContent').html(data);
-                })
-                .fail(function() {
+                }).fail(function() {
                     $('#modalContent').html('<div class="alert alert-danger m-3">Gagal mengambil data.</div>');
                 });
-        });
+            });
 
-        // SWEETALERT APPROVE
-    $('#btnApproveAction').on('click', function(e) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'Setujui Perubahan Produk?',
-            text: "Data produk/stok akan diperbarui.",
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Ya, Setujui',
-            cancelButtonText: 'Batal',
-            confirmButtonColor: '#1cc88a'
-        }).then((result) => {
-            if (result.isConfirmed) $('#formApprove').submit();
-        });
-    });
+            // --- SWEETALERT APPROVE ---
+            $('#btnApproveAction').on('click', function(e) {
+                e.preventDefault();
+                Swal.fire({
+                    title: 'Setujui Pembayaran?',
+                    text: "Pastikan dana sudah masuk mutasi bank.",
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonText: 'Ya, Valid',
+                    cancelButtonText: 'Batal',
+                    confirmButtonColor: '#198754'
+                }).then((result) => {
+                    if (result.isConfirmed) $('#formApprove').submit();
+                });
+            });
 
-    // SWEETALERT REJECT
-    $('#btnRejectAction').on('click', function(e) {
-        e.preventDefault();
-        Swal.fire({
-            title: 'Tolak Pengajuan?',
-            text: "Masukkan alasan penolakan:",
-            icon: 'warning',
-            input: 'text',
-            inputPlaceholder: 'Contoh: Stok tidak sesuai fisik',
-            showCancelButton: true,
-            confirmButtonText: 'Tolak',
-            confirmButtonColor: '#e74a3b',
-            inputValidator: (value) => {
-                if (!value) return 'Alasan wajib diisi!'
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                $('#reasonInput').val(result.value);
-                $('#formReject').submit();
-            }
+            // --- SWEETALERT REJECT ---
+            $('#btnRejectAction').on('click', function(e) {
+                e.preventDefault();
+
+                // Hide modal to prevent focus trap interference with SweetAlert input
+                $('#modalReview').modal('hide');
+
+                Swal.fire({
+                    title: 'Tolak Pengajuan?',
+                    text: "Masukkan alasan penolakan:",
+                    icon: 'warning',
+                    input: 'text',
+                    inputPlaceholder: 'Contoh: Bukti transfer buram/palsu',
+                    showCancelButton: true,
+                    confirmButtonText: 'Tolak',
+                    confirmButtonColor: '#dc3545',
+                    inputValidator: (value) => {
+                        if (!value) return 'Alasan wajib diisi!'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        $('#reasonInput').val(result.value);
+                        $('#formReject').submit();
+                    } else {
+                        // Show modal again if user cancels
+                        $('#modalReview').modal('show');
+                    }
+                });
+            });
+
         });
-    });
     </script>
 @endpush

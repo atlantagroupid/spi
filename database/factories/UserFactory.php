@@ -29,6 +29,21 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            'role' => fake()->randomElement([
+                'manager_operasional',
+                'manager_bisnis',
+                'sales_field',
+                'sales_store',
+                'kepala_gudang',
+                'admin_gudang',
+                'purchase',
+                'finance',
+                'kasir'
+            ]),
+            'phone' => fake()->optional()->phoneNumber(),
+            'sales_target' => fake()->numberBetween(10000000, 50000000), // Ensure not null
+            'daily_visit_target' => fake()->numberBetween(3, 10),
+            'credit_limit_quota' => fake()->numberBetween(1000000, 10000000),
         ];
     }
 

@@ -21,7 +21,9 @@ class UserSeeder extends Seeder
                 'name' => 'Manager Operasional',
                 'email' => 'manager_ops@bintang.com',
                 'role' => 'manager_operasional', // Super Admin
-                'credit_limit_quota' => 0, // 0 tidak masalah karena dia adalah 'Pusat Otoritas'
+                // BERIKAN MODAL BESAR (Misal: 100 Miliar)
+                // Ini dianggap sebagai "Total Budget Kredit Perusahaan"
+                'credit_limit_quota' => 100000000000, // 100 MILIAR
             ],
             [
                 'name' => ' Manager Bisnis',

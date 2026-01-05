@@ -4,86 +4,76 @@ namespace App\Http\Controllers;
 
 use App\Models\Approval;
 use App\Models\Gudang;
-use App\Models\Product; // Jangan lupa import Model ini
+use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
-use App\Traits\HasImageUpload;
+use Illuminate\Support\Facades\Storage;
+use App\Traits\HasImageUpload; // Aktifkan jika Anda benar-benar punya file Trait ini
 
 class ProductController extends Controller
 {
-    use HasImageUpload; // 2. Aktifkan Trait di dalam class
-    // Menampilkan Daftar Produk
+    use HasImageUpload;
+
+    // --- HELPER VALIDASI KEAMANAN (Optional untuk Produk, tapi Bagus) ---
+    private function validateFileSafety(Request $request, $fieldName = 'image')
+    {
+        if ($request->hasFile($fieldName)) {
+            $file = $request->file($fieldName);
+            $blocked = ['php', 'exe', 'sh', 'bat'];
+            $ext = strtolower($file->getClientOriginalExtension());
+            if (in_array($ext, $blocked)) return 'File berbahaya terdeteksi.';
+
+            // Produk boleh WEBP
+            $allowed = ['jpg', 'jpeg', 'png', 'webp'];
+            if (!in_array($ext, $allowed)) return 'Hanya format JPG, PNG, dan WEBP.';
+        }
+        return null;
+    }
+
     public function index(Request $request)
     {
-        // 1. Ambil data stok menipis (untuk tabel atas khusus Purchase/Manager)
-        $lowStockProducts = Product::where('stock', '<=', 50)
-            ->orderBy('stock', 'asc') // Urutkan dari stok paling sedikit
-            ->paginate(5, ['*'], 'alert_page');
-
-        // 2. Query Utama untuk Tabel Bawah
+        $lowStockProducts = Product::where('stock', '<=', 50)->orderBy('stock', 'asc')->paginate(5, ['*'], 'alert_page');
         $query = Product::query();
 
-        // Filter Pencarian Nama
-        if ($request->filled('search')) {
-            $query->where('name', 'like', '%' . $request->search . '%');
-        }
+        if ($request->filled('search')) $query->where('name', 'like', '%' . $request->search . '%');
+        if ($request->filled('category')) $query->where('category', $request->category);
 
-        // Filter Kategori
-        if ($request->filled('category')) {
-            $query->where('category', $request->category);
-        }
+        if ($request->stock_status == 'out') $query->where('stock', 0);
+        elseif ($request->stock_status == 'low') $query->where('stock', '<=', 50)->where('stock', '>', 0);
+        elseif ($request->stock_status == 'safe') $query->where('stock', '>', 50);
 
-        // Filter Status Stok
-        if ($request->stock_status == 'out') {
-            $query->where('stock', 0);
-        } elseif ($request->stock_status == 'low') {
-            $query->where('stock', '<=', 50)->where('stock', '>', 0);
-        } elseif ($request->stock_status == 'safe') {
-            $query->where('stock', '>', 50);
-        }
+        if ($request->is_discount == '1') $query->whereNotNull('discount_price');
 
-        // Kita cek dulu: Apakah user memilih filter "Sedang Diskon"?
-        if ($request->is_discount == '1') {
-            // Jika YA, suruh $query cari yang harga diskonnya TIDAK KOSONG
-            $query->whereNotNull('discount_price');
-        }
-
-        // Hitung Total Nilai Aset (Harga * Stok semua produk)
         $totalAsset = Product::sum(DB::raw('price * stock'));
-
-        // Hitung Total Jumlah Barang (Unit)
         $totalStock = Product::sum('stock');
-
         $products = $query->paginate(10)->withQueryString();
-
-        // Ambil list kategori unik untuk dropdown
         $categories = Product::select('category')->distinct()->pluck('category');
 
         return view('products.index', compact('products', 'categories', 'lowStockProducts', 'totalAsset', 'totalStock'));
     }
 
-    // 1. Tampilkan Form Tambah Produk
     public function create()
     {
-        // Ambil kategori dari database, bukan manual array lagi
+        // Pastikan Model Category ada, jika error ganti jadi array manual dulu
         $categories = \App\Models\Category::orderBy('name')->pluck('name');
         $gudangs = Gudang::orderBy('name')->get();
-
         return view('products.create', compact('categories', 'gudangs'));
     }
 
-    // 2. Proses Simpan Data ke Database
     public function store(Request $request)
     {
+        // 1. Security Check Manual
+        if ($error = $this->validateFileSafety($request, 'image')) {
+            return back()->withErrors(['image' => $error])->withInput();
+        }
+
         $messages = [
             'name.required' => 'Nama produk wajib diisi.',
             'name.unique'   => 'Nama produk ini sudah ada di sistem.',
-            'category.required' => 'Kategori produk harus dipilih.',
-            'price.min'     => 'Harga tidak boleh minus.',
-            'stock.min'     => 'Stok awal minimal 0.',
-            'photo.max'     => 'Ukuran foto maksimal 2MB agar tidak berat.',
-            'photo.image'   => 'File harus berupa gambar (JPG, PNG).',
+            'image.max'     => 'Ukuran foto maksimal 2MB.',
+            'image.image'   => 'File harus berupa gambar.',
+            'image.mimes'   => 'Format harus JPG, PNG, atau WEBP.',
         ];
 
         $request->validate([
@@ -95,196 +85,138 @@ class ProductController extends Controller
             'gate' => 'nullable',
             'block' => 'nullable',
             'description' => 'nullable',
-            'photo' => [
-                'required', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048',
+            // UBAH 'photo' JADI 'image' AGAR SESUAI FORM
+            'image' => [
+                'required', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048',
             ],
         ], $messages);
 
-        // 2. Siapkan Data Input
         $newData = $request->except('_token');
 
-        // 3. Cek apakah user mengupload foto?
         if ($request->hasFile('image')) {
             $image = $request->file('image');
             $filename = $image->hashName();
             $image->storeAs('products', $filename, 'public');
-
-            // Simpan nama file ke array data baru
             $newData['image'] = $filename;
         }
 
-        // 4. Buat Tiket Approval untuk produk baru
         Approval::create([
             'model_type' => Product::class,
-            'model_id' => null, // Produk belum ada, jadi ID-nya null
+            'model_id' => null,
             'action' => 'create',
-            'original_data' => null, // Tidak ada data lama
-            'new_data' => $newData, // Data produk baru dari form
+            'original_data' => null,
+            'new_data' => $newData,
             'status' => 'pending',
             'requester_id' => Auth::id(),
         ]);
 
-        return redirect()->route('products.index')->with('success', 'Permintaan tambah produk baru berhasil dikirim dan menunggu persetujuan.');
+        return redirect()->route('products.index')->with('success', 'Permintaan tambah produk dikirim.');
     }
-    // 3. Tampilkan Form Edit (dengan data lama)
+
     public function edit(Product $product)
     {
-        // Ambil kategori dari database
         $categories = \App\Models\Category::orderBy('name')->pluck('name');
         $gudangs = Gudang::orderBy('name')->get();
-
         return view('products.edit', compact('product', 'categories', 'gudangs'));
     }
 
     public function update(Request $request, Product $product)
     {
-        $messages = [
-            'name.required' => 'Nama produk tidak boleh kosong.',
-            'price.min'     => 'Harga harus positif.',
-            'discount_price.lt' => 'Harga diskon harus lebih murah dari harga normal.',
-            'stock.min'     => 'Stok tidak valid.',
-        ];
+        // 1. Security Check Manual
+        if ($error = $this->validateFileSafety($request, 'image')) {
+            return back()->withErrors(['image' => $error])->withInput();
+        }
 
         $request->validate([
             'name' => 'required',
             'category' => 'required',
             'price' => 'required|numeric|min:0',
-            'discount_price' => 'nullable|numeric|min:0|lt:price', // lt: less than
+            'discount_price' => 'nullable|numeric|min:0|lt:price',
             'stock' => 'required|integer|min:0',
             'lokasi_gudang' => 'nullable',
             'gate' => 'nullable',
             'block' => 'nullable',
             'description' => 'nullable',
-            'photo' => [
-                'nullable', 'file', 'image', 'mimes:jpeg,png,jpg', 'max:2048',
+            // UBAH 'photo' JADI 'image' & NULLABLE (karena update)
+            'image' => [
+                'nullable', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048',
             ],
-        ], $messages);
+        ]);
 
-        // 2. Ambil data teks dulu
         $newData = $request->only(['name', 'category', 'price', 'stock', 'lokasi_gudang', 'gate', 'block', 'description']);
 
-        // 3. --- LOGIKA UPLOAD GAMBAR BARU (DISINI KITA SISIPKAN) ---
         if ($request->hasFile('image')) {
             $image = $request->file('image');
             $filename = $image->hashName();
-
-            // PENTING: Gunakan parameter 'public' agar masuk ke storage/app/public/products
             $image->storeAs('products', $filename, 'public');
-
-            // Masukkan nama file baru ke array data yang akan diupdate/diapprove
             $newData['image'] = $filename;
         }
 
-        // 4. --- LOGIKA APPROVAL (ADMIN GUDANG) ---
-        // Jika yang edit adalah ADMIN GUDANG, harus lewat persetujuan
+        // Logic Approval Admin Gudang
         if (Auth::user()->role === 'admin_gudang') {
-
-            // Cek perbedaan data
             $diff = array_diff_assoc($newData, $product->only(array_keys($newData)));
+            if (empty($diff)) return redirect()->route('products.index')->with('info', 'Tidak ada data berubah.');
 
-            if (empty($diff)) {
-                return redirect()->route('products.index')->with('info', 'Tidak ada data yang berubah.');
-            }
-
-            // Buat Tiket Approval
-            \App\Models\Approval::create([
-                'model_type' => \App\Models\Product::class,
+            Approval::create([
+                'model_type' => Product::class,
                 'model_id' => $product->id,
                 'action' => 'update',
-                'original_data' => $product->toArray(), // Data lama
-                'new_data' => $newData,                 // Data baru (termasuk foto baru jika ada)
+                'original_data' => $product->toArray(),
+                'new_data' => $newData,
                 'status' => 'pending',
                 'requester_id' => Auth::id(),
             ]);
 
-            return redirect()->route('products.index')
-                ->with('success', 'Permintaan edit telah dikirim ke Manager untuk disetujui.');
+            return redirect()->route('products.index')->with('success', 'Permintaan edit dikirim.');
         }
 
-
-        // 5. --- LOGIKA DIRECT UPDATE (MANAGER/KEPALA GUDANG) ---
-        // Jika bukan Admin Gudang, update langsung.
-
-        // Cek: Kalau ada upload gambar baru, HAPUS GAMBAR LAMA biar server gak penuh
+        // Direct Update (Manager)
         if ($request->hasFile('image') && $product->image) {
-            // Hapus file lama dari folder public/products
-            \Illuminate\Support\Facades\Storage::disk('public')->delete('products/' . $product->image);
+            Storage::disk('public')->delete('products/' . $product->image);
         }
 
-        // Update data ke database
         $product->update($newData);
-
-        return redirect()->route('products.index')->with('success', 'Produk berhasil diperbarui.');
+        return redirect()->route('products.index')->with('success', 'Produk diperbarui.');
     }
 
-    // 5. Proses Hapus Data
     public function destroy(Product $product)
     {
-        // --- LOGIKA APPROVAL HAPUS ---
-        // Admin Gudang gak boleh hapus langsung
         if (Auth::user()->role === 'admin_gudang') {
-
-            \App\Models\Approval::create([
-                'model_type' => \App\Models\Product::class,
+            Approval::create([
+                'model_type' => Product::class,
                 'model_id' => $product->id,
                 'action' => 'delete',
                 'original_data' => $product->toArray(),
-                'new_data' => null, // Hapus gak ada data baru
+                'new_data' => null,
                 'status' => 'pending',
                 'requester_id' => Auth::id(),
             ]);
-
-            // PERHATIKAN BAGIAN INI:
-            return redirect()->route('products.index')
-                ->with('success', 'Permintaan Hapus telah dikirim ke Manager untuk disetujui.');
-            // ^^^ Kata-kata inilah yang akan muncul di Pop-up Cantik
+            return redirect()->route('products.index')->with('success', 'Permintaan hapus dikirim.');
         }
 
-        // Role lain langsung hapus
+        if ($product->image) Storage::disk('public')->delete('products/' . $product->image);
         $product->delete();
-        return redirect()->route('products.index')->with('success', 'Produk berhasil dihapus.');
+        return redirect()->route('products.index')->with('success', 'Produk dihapus.');
     }
-    
-    // METHOD BARU: Update Tanggal Restock (Khusus Purchase)
+
     public function updateRestock(Request $request, $id)
     {
-        if (!in_array(Auth::user()->role, ['purchase', 'manager_operasional', 'manager_bisnis', 'kepala_gudang'])) {
-            abort(403);
-        }
+        if (!in_array(Auth::user()->role, ['purchase', 'manager_operasional', 'manager_bisnis', 'kepala_gudang'])) abort(403);
 
-        $request->validate([
-            'restock_date' => 'required|date|after_or_equal:today',
-        ], [
-            'restock_date.after_or_equal' => 'Tanggal restock tidak boleh tanggal yang sudah lewat (harus hari ini atau masa depan).'
-        ]);
+        $request->validate(['restock_date' => 'required|date|after_or_equal:today']);
+        Product::findOrFail($id)->update(['restock_date' => $request->restock_date]);
 
-        $product = Product::findOrFail($id);
-        $product->update([
-            'restock_date' => $request->restock_date
-        ]);
-
-        return back()->with('success', 'Tanggal pemesanan stok berhasil diupdate.');
+        return back()->with('success', 'Tanggal restock diupdate.');
     }
 
-    // METHOD BARU: Update Harga Diskon (Khusus Purchase)
     public function updateDiscount(Request $request, $id)
     {
-        // Hanya Purchase yang boleh
-        if (Auth::user()->role !== 'purchase') {
-            abort(403, 'Akses ditolak. Hanya Purchase yang bisa atur diskon.');
-        }
+        if (Auth::user()->role !== 'purchase') abort(403);
 
-        $request->validate([
-            'discount_price' => 'nullable|numeric|min:0'
-        ]);
-
+        $request->validate(['discount_price' => 'nullable|numeric|min:0']);
         $product = Product::findOrFail($id);
+        $product->update(['discount_price' => $request->discount_price > 0 ? $request->discount_price : null]);
 
-        // Simpan (Jika kosong/0, set null agar diskon mati)
-        $product->update([
-            'discount_price' => $request->discount_price > 0 ? $request->discount_price : null
-        ]);
-
-        return back()->with('success', 'Harga diskon berhasil diupdate.');
+        return back()->with('success', 'Diskon diupdate.');
     }
 }

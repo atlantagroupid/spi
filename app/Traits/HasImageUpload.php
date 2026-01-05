@@ -11,6 +11,18 @@ trait HasImageUpload
 {
     public function uploadCompressed(UploadedFile $file, $folder, $oldFile = null)
     {
+        // MIME Type validation to prevent malicious file uploads
+        $allowedMimeTypes = [
+            'image/jpeg',
+            'image/png',
+            'image/jpg',
+            'application/pdf'
+        ];
+
+        if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+            throw new \Exception('File type not allowed. Only JPG, PNG images and PDF files are accepted.');
+        }
+
         // 1. Hapus File Lama
         if ($oldFile && Storage::disk('public')->exists($oldFile)) {
             Storage::disk('public')->delete($oldFile);

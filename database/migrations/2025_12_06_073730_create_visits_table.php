@@ -17,7 +17,8 @@ return new class extends Migration
             $table->foreignId('customer_id')->constrained()->cascadeOnDelete(); // Toko mana
 
             // Rencana & Realisasi
-            $table->enum('status', ['planned', 'completed', 'cancelled'])->default('planned'); // Status kunjungan
+            // For SQLite compatibility, use string with default instead of enum
+            $table->string('status')->default('planned'); // Status kunjungan: planned, in_progress, completed, cancelled
             $table->date('visit_date'); // Tanggal rencana kunjungan
 
             // Data Check-in (GPS & Foto)

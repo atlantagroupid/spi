@@ -80,27 +80,30 @@ class DashboardController extends Controller
             // --- LOGIKA SALES FIELD (Lapangan) ---
             $visitTarget = $user->daily_visit_target ?? 5;
 
-            $todayVisits = Visit::where('user_id', $user->id)
-                ->whereDate('created_at', date('Y-m-d'))
-                ->where('status', 'completed')
-                ->count();
+            // OPTIMIZE: Single query untuk stats dan planned visits
+            $visitStats = Visit::selectRaw('
+                    COUNT(*) as total_visits,
+                    SUM(CASE WHEN status = "completed" THEN 1 ELSE 0 END) as completed_visits
+                ')
+                ->where('user_id', $user->id)
+                ->whereDate('created_at', today())
+                ->first();
 
+            $todayVisits = $visitStats->completed_visits ?? 0;
             $visitPercentage = ($visitTarget > 0) ? ($todayVisits / $visitTarget) * 100 : 0;
 
-            // Rencana Kunjungan Hari Ini
+            // Rencana Kunjungan Hari Ini (dengan eager loading)
             $plannedVisits = Visit::with('customer')
                 ->where('user_id', $user->id)
-                ->whereDate('created_at', date('Y-m-d'))
+                ->whereDate('created_at', today())
                 ->get();
         } else {
             // --- LOGIKA SALES STORE (Toko) ---
-            // Sales store tidak punya target kunjungan keluar, tapi kita tetap hitung
-            // berapa customer yang mereka layani (Check-in di toko) hari ini sebagai info saja.
+            // OPTIMIZE: Single query
             $todayVisits = Visit::where('user_id', $user->id)
-                ->whereDate('created_at', date('Y-m-d'))
+                ->whereDate('created_at', today())
                 ->count();
 
-            // Percentage kita set 100 atau 0 agar tidak error, tapi nanti di view kita hidden widgetnya
             $visitPercentage = 0;
         }
 
@@ -112,14 +115,18 @@ class DashboardController extends Controller
         $isCritical = false;
 
         if ($limitQuota > 0) {
-            $unpaidOrders = Order::where('user_id', $user->id)
+            // OPTIMIZE: Eager load paymentLogs untuk menghindari N+1 query
+            $unpaidOrders = Order::with(['paymentLogs' => function ($query) {
+                    $query->where('status', 'approved');
+                }])
+                ->where('user_id', $user->id)
                 ->whereIn('payment_type', ['top', 'kredit'])
                 ->where('payment_status', '!=', 'paid')
                 ->whereNotIn('status', ['cancelled', 'rejected'])
                 ->get();
 
             foreach ($unpaidOrders as $o) {
-                $paidAmount = $o->paymentLogs->where('status', 'approved')->sum('amount');
+                $paidAmount = $o->paymentLogs->sum('amount');
                 $usedCredit += ($o->total_price - $paidAmount);
             }
 
