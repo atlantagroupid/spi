@@ -176,7 +176,7 @@ class DashboardController extends Controller
         ];
 
         // 3. Approval Pending
-        $pendingApprovalCount = Approval::where('status', 'pending')->count();
+        $pendingApprovalCount = Approval::where('status', 'pending')->count() + \App\Models\TopSubmission::where('status', 'pending')->count();
 
         // 4. Leaderboard Sales
         $topSales = User::whereIn('role', ['sales_field', 'sales_store'])

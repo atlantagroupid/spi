@@ -21,7 +21,7 @@
             </div>
         </div>
 
-        @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+        @if (Auth::user()->role === 'admin_gudang')
             <a href="{{ route('products.create') }}" class="btn btn-primary shadow-sm w-100 w-md-auto">
                 <i class="bi bi-plus-lg me-2"></i> Tambah Produk
             </a>
@@ -48,10 +48,12 @@
                                         <div class="small text-muted"><i class="bi bi-clock-history me-1"></i>Pesan: {{ date('d/m/y', strtotime($item->restock_date)) }}</div>
                                     @endif
                                 </div>
+                                @if(Auth::user()->role === 'purchase')
                                 <button class="btn btn-sm btn-outline-primary rounded-pill px-3"
                                     onclick="openRestockModal('{{ $item->id }}', '{{ $item->name }}', '{{ $item->restock_date }}')">
                                     Update
                                 </button>
+                                @endif
                             </div>
                         @endforeach
                     </div>
@@ -121,7 +123,7 @@
                         <th>Lokasi</th>
                         <th>Harga</th>
                         <th class="text-center">Stok</th>
-                        @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                        @if (Auth::user()->role === 'admin_gudang')
                             <th class="text-center pe-4">Aksi</th>
                         @endif
                     </tr>
@@ -156,7 +158,7 @@
                             <td class="text-center">
                                 <span class="badge {{ $product->stock <= 10 ? 'bg-warning text-dark' : 'bg-success' }} rounded-pill px-3">{{ $product->stock }}</span>
                             </td>
-                            @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                            @if (Auth::user()->role === 'admin_gudang')
                                 <td class="text-center pe-4">
                                     <div class="btn-group">
                                         <a href="{{ route('products.edit', $product->id) }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil-square"></i></a>
@@ -194,7 +196,7 @@
                             <div class="flex-grow-1 min-width-0">
                                 <div class="d-flex justify-content-between align-items-start">
                                     <h6 class="fw-bold text-dark mb-1 text-truncate">{{ $product->name }}</h6>
-                                    @if (in_array(Auth::user()->role, ['manager_operasional', 'kepala_gudang', 'admin_gudang']))
+                                    @if (Auth::user()->role === 'admin_gudang')
                                         <div class="dropdown">
                                             <button class="btn btn-link text-muted p-0" type="button" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button>
                                             <ul class="dropdown-menu dropdown-menu-end border-0 shadow">

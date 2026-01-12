@@ -89,7 +89,7 @@ class TopSubmissionController extends Controller
             'notes'            => "Jenis Pengajuan: " . $noteType,
         ]);
 
-        return redirect()->route('top-submissions.index')->with('success', 'Pengajuan berhasil dikirim ke Manager.');
+        return redirect()->route('top-submissions.create')->with('success', 'Pengajuan berhasil dikirim ke Manager.');
     }
 
 
@@ -98,6 +98,13 @@ class TopSubmissionController extends Controller
     // 3. List Pengajuan Masuk
     public function index()
     {
+        $user = Auth::user();
+
+        // Hanya Manager Bisnis dan Manager Operasional yang bisa akses
+        if (!in_array($user->role, ['manager_bisnis', 'manager_operasional'])) {
+            abort(403, 'Anda tidak memiliki akses ke halaman ini.');
+        }
+
         // Tampilkan semua pengajuan, urutkan dari yang terbaru
         $submissions = \App\Models\TopSubmission::with(['user', 'customer'])
         ->where('status', 'pending')

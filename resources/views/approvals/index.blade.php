@@ -16,7 +16,7 @@
                     <div class="card bg-light border-0 h-100">
                         <div class="card-body text-center p-2">
                             <small class="text-uppercase text-muted fw-bold">Total Pending</small>
-                            <h3 class="fw-bold text-dark mb-0">{{ $approvals->total() }}</h3>
+                            <h3 class="fw-bold text-dark mb-0">{{ $paginatedApprovals->total() }}</h3>
                         </div>
                     </div>
                 </div>
@@ -24,7 +24,7 @@
                     <div class="alert alert-info w-100 mb-0 py-2 border-0 small">
                         <i class="bi bi-info-circle me-1"></i>
                         <strong>Info:</strong> Halaman ini menampilkan seluruh permintaan persetujuan dari divisi Bisnis
-                        (Order/Customer) dan Gudang (Produk).
+                        (Order/Customer), Gudang (Produk), dan Limit Kredit/TOP.
                     </div>
                 </div>
             </div>
@@ -42,7 +42,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @forelse($approvals as $item)
+                        @forelse($paginatedApprovals as $item)
                             <tr>
                                 {{-- 1. TANGGAL --}}
                                 <td>
@@ -52,7 +52,9 @@
 
                                 {{-- 2. DIVISI / TIPE --}}
                                 <td>
-                                    @if (str_contains($item->model_type, 'Order'))
+                                    @if ($item instanceof \App\Models\TopSubmission)
+                                        <span class="badge bg-info w-100 py-2">LIMIT KREDIT / TOP</span>
+                                    @elseif (str_contains($item->model_type, 'Order'))
                                         <span class="badge bg-primary w-100 py-2">ORDER / TRANSAKSI</span>
                                     @elseif(str_contains($item->model_type, 'Payment'))
                                         <span class="badge bg-success w-100 py-2">KEUANGAN / PIUTANG</span>
@@ -67,16 +69,31 @@
 
                                 {{-- 3. PENGAJU --}}
                                 <td>
-                                    <div class="fw-bold">{{ $item->requester->name ?? '-' }}</div>
-                                    <small class="text-muted text-uppercase" style="font-size: 0.7rem;">
-                                        {{ $item->requester->role ?? 'Staff' }}
-                                    </small>
+                                    @if ($item instanceof \App\Models\TopSubmission)
+                                        <div class="fw-bold">{{ $item->user->name ?? '-' }}</div>
+                                        <small class="text-muted text-uppercase" style="font-size: 0.7rem;">
+                                            {{ $item->user->role ?? 'Sales' }}
+                                        </small>
+                                    @else
+                                        <div class="fw-bold">{{ $item->requester->name ?? '-' }}</div>
+                                        <small class="text-muted text-uppercase" style="font-size: 0.7rem;">
+                                            {{ $item->requester->role ?? 'Staff' }}
+                                        </small>
+                                    @endif
                                 </td>
 
                                 {{-- 4. KETERANGAN (FIXED LOGIC) --}}
                                 <td>
+                                    @if ($item instanceof \App\Models\TopSubmission)
+                                        <div class="fw-bold text-info">{{ $item->customer->name ?? '-' }}</div>
+                                        @if ($item->submission_limit > 0)
+                                            <small class="text-muted">Limit: Rp {{ number_format($item->submission_limit, 0, ',', '.') }}</small>
+                                        @endif
+                                        @if ($item->submission_days > 0)
+                                            <small class="text-muted">Tempo: {{ $item->submission_days }} Hari</small>
+                                        @endif
                                     {{-- KASUS 1: ORDER --}}
-                                    @if (str_contains($item->model_type, 'Order'))
+                                    @elseif (str_contains($item->model_type, 'Order'))
                                         <div class="fw-bold text-primary">Invoice:
                                             {{ $item->new_data['invoice_number'] ?? ($item->data['invoice_number'] ?? '-') }}</div>
                                         <small class="text-muted">Total: Rp
@@ -125,11 +142,28 @@
 
                                 {{-- 5. AKSI --}}
                                 <td class="text-center">
-                                    <button type="button"
-                                        class="btn btn-outline-primary btn-sm fw-bold shadow-sm px-3 btn-review"
-                                        data-id="{{ $item->id }}">
-                                        <i class="bi bi-search me-1"></i> Review
-                                    </button>
+                                    @if ($item instanceof \App\Models\TopSubmission)
+                                        <div class="d-flex justify-content-center gap-1">
+                                            <form id="form-approve-{{ $item->id }}" action="{{ route('top-submissions.approve', $item->id) }}" method="POST" class="d-inline">
+                                                @csrf @method('PUT')
+                                                <button type="button" onclick="confirmTopAction('{{ $item->id }}', 'approve')" class="btn btn-sm btn-success text-white shadow-sm" title="Setujui">
+                                                    <i class="bi bi-check-lg"></i>
+                                                </button>
+                                            </form>
+                                            <form id="form-reject-{{ $item->id }}" action="{{ route('top-submissions.reject', $item->id) }}" method="POST" class="d-inline">
+                                                @csrf @method('PUT')
+                                                <button type="button" onclick="confirmTopAction('{{ $item->id }}', 'reject')" class="btn btn-sm btn-outline-danger shadow-sm" title="Tolak">
+                                                    <i class="bi bi-x-lg"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    @else
+                                        <button type="button"
+                                            class="btn btn-outline-primary btn-sm fw-bold shadow-sm px-3 btn-review"
+                                            data-id="{{ $item->id }}">
+                                            <i class="bi bi-search me-1"></i> Review
+                                        </button>
+                                    @endif
                                 </td>
                             </tr>
                         @empty
@@ -147,7 +181,7 @@
 
             {{-- Pagination --}}
             <div class="mt-3">
-                {{ $approvals->links() }}
+                {{ $paginatedApprovals->links() }}
             </div>
         </div>
     </div>
@@ -255,5 +289,52 @@
                 }
             });
         });
+
+        // FUNCTION FOR TOP SUBMISSION ACTIONS
+        function confirmTopAction(id, type) {
+            if (type === 'approve') {
+                Swal.fire({
+                    title: 'Setujui Pengajuan?',
+                    text: 'Pastikan data sudah benar. Limit customer akan diperbarui & kuota Anda terpotong.',
+                    icon: 'question',
+                    showCancelButton: true,
+                    confirmButtonColor: '#198754',
+                    cancelButtonColor: '#6c757d',
+                    confirmButtonText: 'Ya, Setujui!',
+                    cancelButtonText: 'Batal',
+                    reverseButtons: true
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        document.getElementById('form-approve-' + id).submit();
+                    }
+                });
+            } else {
+                // For reject, ask for reason like the regular approvals
+                Swal.fire({
+                    title: 'Tolak Pengajuan?',
+                    text: "Masukkan alasan penolakan:",
+                    icon: 'warning',
+                    input: 'text',
+                    inputPlaceholder: 'Contoh: Data tidak sesuai',
+                    showCancelButton: true,
+                    confirmButtonText: 'Tolak',
+                    confirmButtonColor: '#e74a3b',
+                    inputValidator: (value) => {
+                        if (!value) return 'Alasan wajib diisi!'
+                    }
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Add hidden input for reason
+                        let form = document.getElementById('form-reject-' + id);
+                        let reasonInput = document.createElement('input');
+                        reasonInput.type = 'hidden';
+                        reasonInput.name = 'notes';
+                        reasonInput.value = result.value;
+                        form.appendChild(reasonInput);
+                        form.submit();
+                    }
+                });
+            }
+        }
     </script>
 @endpush

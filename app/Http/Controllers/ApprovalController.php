@@ -38,8 +38,27 @@ class ApprovalController extends Controller
             abort(403, 'Akses Ditolak');
         }
 
-        $approvals = $query->latest()->paginate(10);
-        return view('approvals.index', compact('approvals'));
+        $approvals = $query->latest()->get(); // Get all instead of paginate
+
+        // Tambahkan Top Submissions untuk Manager Operasional
+        if ($user->role === 'manager_operasional') {
+            $topSubs = TopSubmission::with(['user', 'customer'])->where('status', 'pending')->latest()->get();
+            $approvals = $approvals->merge($topSubs);
+        }
+
+        // Sort by created_at desc and paginate
+        $approvals = $approvals->sortByDesc('created_at')->values();
+        $perPage = 10;
+        $currentPage = \Illuminate\Pagination\Paginator::resolveCurrentPage() ?: 1;
+        $paginatedApprovals = new \Illuminate\Pagination\LengthAwarePaginator(
+            $approvals->slice(($currentPage - 1) * $perPage, $perPage)->all(),
+            $approvals->count(),
+            $perPage,
+            $currentPage,
+            ['path' => request()->url(), 'pageName' => 'page']
+        );
+
+        return view('approvals.index', compact('approvals', 'paginatedApprovals'));
     }
 
     // --- Menggunakan Helper Private untuk mengurangi duplikasi code ---
@@ -291,10 +310,10 @@ class ApprovalController extends Controller
         // 2. Query TOP Submission (Hanya Bisnis/Ops)
         $topSubmissions = collect();
         if (in_array($user->role, ['manager_bisnis', 'manager_operasional'])) {
-            $topQuery = TopSubmission::with(['sales', 'customer', 'approver'])
+            $topQuery = TopSubmission::with(['user', 'customer', 'approver'])
                 ->whereIn('status', ['approved', 'rejected']);
 
-            if ($search) $topQuery->whereHas('sales', fn($q) => $q->where('name', 'like', "%$search%"));
+            if ($search) $topQuery->whereHas('user', fn($q) => $q->where('name', 'like', "%$search%"));
 
             if ($date) {
                 $topQuery->whereDate('updated_at', $date);

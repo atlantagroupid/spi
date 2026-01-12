@@ -45,6 +45,7 @@ class SettingSeeder extends Seeder
             'Studio Design',        // Konsultan/Arsitek
             'Furniture',
             'Toko / Reseller', // Toko bangunan lain
+            'Retail', // Divisi Retail
         ];
 
         foreach ($customerCats as $cc) {

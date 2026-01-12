@@ -78,9 +78,9 @@
 
                                 {{-- 2. PENGAJU --}}
                                 <td>
-                                    {{-- Cek jika ini TOP (karena relasinya beda: 'sales' bukan 'requester') --}}
+                                    {{-- Cek jika ini TOP (karena relasinya beda: 'user' bukan 'requester') --}}
                                     @if($item->history_type == 'TOP')
-                                        <div class="fw-bold text-dark">{{ $item->sales->name ?? 'Sales' }}</div>
+                                        <div class="fw-bold text-dark">{{ $item->user->name ?? 'Sales' }}</div>
                                         <small class="text-muted">Sales</small>
                                     @else
                                         <div class="fw-bold text-dark">{{ $item->requester->name ?? 'User Terhapus' }}</div>

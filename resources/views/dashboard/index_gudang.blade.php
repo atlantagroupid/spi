@@ -69,19 +69,22 @@
 
     {{-- AREA KERJA GUDANG --}}
     <div class="row">
-        <div class="col-md-6">
+        <div class="col-md-{{ $user->role === 'kepala_gudang' ? '6' : '12' }}">
             <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-white fw-bold">Aksi Cepat</div>
                 <div class="card-body d-grid gap-2">
+                    @if($user->role === 'admin_gudang')
                     <a href="{{ route('products.create') }}" class="btn btn-outline-primary text-start">
                         <i class="bi bi-box-seam me-2"></i> Tambah Produk Baru
                     </a>
+                    @endif
                     <a href="{{ route('stock_movements.index') }}" class="btn btn-outline-secondary text-start">
                         <i class="bi bi-arrow-left-right me-2"></i> Riwayat Keluar/Masuk
                     </a>
                 </div>
             </div>
         </div>
+        @if($user->role === 'kepala_gudang')
         <div class="col-md-6">
              <div class="card shadow-sm border-0 h-100">
                 <div class="card-header bg-white fw-bold text-danger">Pending Approval</div>
@@ -91,6 +94,7 @@
                 </div>
             </div>
         </div>
+        @endif
     </div>
 </div>
 @endsection

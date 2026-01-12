@@ -31,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
             $notifPayments = 0;
             $notifCustomers = 0;
             $notifProducts = 0;
+            $notifPendingTOP = 0;
 
             if (Auth::check()) {
                 $user = Auth::user();
@@ -56,14 +57,14 @@ class AppServiceProvider extends ServiceProvider
                     $notifPayments = Approval::where('status', 'pending')
                         ->where('model_type', 'LIKE', '%PaymentLog%')->count();
 
-                        $notifTOP = TopSubmission::where('status', 'pending')
+                        $notifPendingTOP = TopSubmission::where('status', 'pending')
                         ->count();
 
                     // Produk HARUS 0 buat Manager Bisnis
                     $notifProducts = 0;
 
                     // Total Manager Bisnis
-                    $notifTotal = $notifCustomers + $notifOrders + $notifPayments + $notifProducts + $notifTOP;
+                    $notifTotal = $notifCustomers + $notifOrders + $notifPayments + $notifProducts + $notifPendingTOP;
                 }
 
                 // --- SKENARIO 3: MANAGER OPERASIONAL (Melihat Semuanya) ---
@@ -72,9 +73,9 @@ class AppServiceProvider extends ServiceProvider
                     $notifOrders    = Approval::where('status', 'pending')->where('model_type', 'LIKE', '%Order%')->count();
                     $notifPayments  = Approval::where('status', 'pending')->where('model_type', 'LIKE', '%PaymentLog%')->count();
                     $notifProducts  = Approval::where('status', 'pending')->where('model_type', 'LIKE', '%Product%')->count();
-
+                    $notifPendingTOP = TopSubmission::where('status', 'pending')->count();
                     // Total Manager Ops = Jumlah Semua Pending di Database
-                    $notifTotal = Approval::where('status', 'pending')->count();
+                    $notifTotal = Approval::where('status', 'pending')->count() + $notifPendingTOP;
                 }
             }
 
@@ -84,6 +85,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with('notifPendingPayments', $notifPayments);
             $view->with('notifPendingCustomers', $notifCustomers);
             $view->with('notifPendingProducts', $notifProducts);
+            $view->with('notifPendingTOP', $notifPendingTOP);
         });
     }
 }
